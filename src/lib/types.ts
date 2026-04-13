@@ -36,11 +36,14 @@ export interface MilestoneReason {
   order_index: number
 }
 
+export type TaskFrequency = 'daily' | 'weekly' | 'none'
+
 export interface Task {
   id: string
   milestone_id: string
   title: string
   is_daily: boolean
+  frequency: TaskFrequency
   order_index: number
   is_completed_today: boolean
   last_completed_at: string | null

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Milestone, Task } from '@/lib/types'
+import { Milestone, Task, TaskFrequency } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import TaskCard from '@/components/task/TaskCard'
 import { ChevronLeft, Plus, Calendar } from 'lucide-react'
@@ -18,6 +18,7 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
   const [tasks, setTasks] = useState(initialTasks)
   const [addOpen, setAddOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [newFrequency, setNewFrequency] = useState<TaskFrequency>('daily')
   const [adding, setAdding] = useState(false)
   const [deadline, setDeadline] = useState(milestone.deadline || '')
   const [savingDeadline, setSavingDeadline] = useState(false)
@@ -32,7 +33,8 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
       .insert({
         milestone_id: milestone.id,
         title: newTitle.trim(),
-        is_daily: true,
+        is_daily: newFrequency === 'daily',
+        frequency: newFrequency,
         order_index: tasks.length,
       })
       .select()
@@ -41,6 +43,7 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
     if (!error && data) {
       setTasks(prev => [...prev, data])
       setNewTitle('')
+      setNewFrequency('daily')
       setAddOpen(false)
     }
     setAdding(false)
@@ -128,7 +131,7 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
       {/* Add task modal */}
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="タスクを追加">
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">日常的にやらなければいけないことを追加しましょう</p>
+          <p className="text-sm text-gray-500">継続してやらなければいけないことを追加しましょう</p>
           <input
             autoFocus
             value={newTitle}
@@ -137,6 +140,29 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
             placeholder="例：英語の本を10ページ読む"
             className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
+          {/* Frequency selector */}
+          <div>
+            <p className="text-xs text-gray-500 mb-2">頻度</p>
+            <div className="flex gap-2">
+              {(['daily', 'weekly', 'none'] as TaskFrequency[]).map(f => {
+                const labels = { daily: '毎日', weekly: '毎週', none: '1回' }
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setNewFrequency(f)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition ${
+                      newFrequency === f
+                        ? 'bg-red-600 text-white border-red-600'
+                        : 'bg-white text-gray-600 border-gray-300'
+                    }`}
+                  >
+                    {labels[f]}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
           <button
             onClick={addTask}
             disabled={adding || !newTitle.trim()}

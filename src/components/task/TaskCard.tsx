@@ -5,6 +5,7 @@ import { Task, TaskReason } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import TaskReasonModal from './TaskReasonModal'
 import { Trash2, GripVertical } from 'lucide-react'
+import { frequencyLabel } from '@/lib/taskUtils'
 
 interface TaskCardProps {
   task: Task
@@ -57,7 +58,12 @@ export default function TaskCard({ task, onDelete }: TaskCardProps) {
         onTouchCancel={cancelLongPress}
       >
         <GripVertical className="w-5 h-5 text-red-400 flex-shrink-0" />
-        <p className="text-white text-sm font-medium flex-1 text-center">{task.title}</p>
+        <div className="flex-1 text-center">
+          <p className="text-white text-sm font-medium">{task.title}</p>
+          <span className="inline-block bg-red-500 text-red-100 text-xs px-2 py-0.5 rounded-full mt-1">
+            {frequencyLabel(task.frequency ?? (task.is_daily ? 'daily' : 'none'))}
+          </span>
+        </div>
         <button
           onClick={e => { e.stopPropagation(); handleDelete() }}
           onMouseDown={e => e.stopPropagation()}

@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Milestone, MilestoneReason } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import ReasonsModal from './ReasonsModal'
-import { Calendar, CheckCircle2 } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
+import { deadlineBadge } from '@/lib/taskUtils'
 import Link from 'next/link'
 
 interface MilestoneRoadmapProps {
@@ -91,13 +92,19 @@ export default function MilestoneRoadmap({ milestones, goalId, onMilestoneUpdate
                 <div className={`relative rounded-2xl p-5 text-center shadow-lg transition-transform active:scale-95 ${
                   milestone.is_achieved ? 'bg-green-500' : 'bg-red-700'
                 }`}>
-                  {/* Calendar icon */}
-                  <div className="absolute top-3 right-3 flex gap-1">
-                    {milestone.deadline && (
-                      <span className="bg-white/20 rounded-full px-2 py-0.5 text-white text-xs">
-                        {new Date(milestone.deadline).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
-                      </span>
-                    )}
+                  {/* Deadline countdown + achieved badge */}
+                  <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+                    {(() => {
+                      const badge = deadlineBadge(milestone.deadline)
+                      if (!badge) return null
+                      return (
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          badge.urgent ? 'bg-yellow-400 text-yellow-900' : 'bg-white/20 text-white'
+                        }`}>
+                          {badge.text}
+                        </span>
+                      )
+                    })()}
                     {milestone.is_achieved && (
                       <CheckCircle2 className="w-5 h-5 text-white" />
                     )}
@@ -109,11 +116,6 @@ export default function MilestoneRoadmap({ milestones, goalId, onMilestoneUpdate
                     </span>
                   </div>
 
-                  {milestone.deadline && (
-                    <p className="text-red-200 text-xs mt-1">
-                      期限: {new Date(milestone.deadline).toLocaleDateString('ja-JP')}
-                    </p>
-                  )}
                 </div>
               </Link>
 
