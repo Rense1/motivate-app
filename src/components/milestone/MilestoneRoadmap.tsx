@@ -88,7 +88,7 @@ export default function MilestoneRoadmap({ milestones, goalId, onMilestoneUpdate
               onTouchEnd={cancelLongPress}
               onTouchCancel={cancelLongPress}
             >
-              <Link href={`/milestones/${goalId}/tasks/${milestone.id}`} onClick={cancelLongPress}>
+              <Link href={`/tasks?goalId=${goalId}&milestoneId=${milestone.id}`} onClick={cancelLongPress}>
                 <div className={`relative rounded-2xl p-5 text-center shadow-lg transition-transform active:scale-95 ${
                   milestone.is_achieved ? 'bg-green-500' : 'bg-red-700'
                 }`}>
