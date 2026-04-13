@@ -48,7 +48,7 @@ export default function MilestonesClient({ goal, milestones: initialMilestones }
   const achieved = milestones.filter(m => m.is_achieved).length
 
   return (
-    <div className="relative">
+    <div className="page-enter relative">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-gray-200">
         <div className="flex items-center gap-2">
