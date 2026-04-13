@@ -421,7 +421,18 @@ export default function AchievementOverlay() {
                 textShadow: '0 2px 8px rgba(0,0,0,0.18)',
               }}
             >
-              👑 王冠獲得！
+              <span style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <Crown
+                  style={{
+                    width: 46,
+                    height: 46,
+                    color: 'white',
+                    filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.22))',
+                    flexShrink: 0,
+                  }}
+                />
+                王冠獲得！
+              </span>
             </motion.div>
             {/* サブテキスト */}
             <motion.div

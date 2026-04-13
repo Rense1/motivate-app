@@ -33,6 +33,16 @@ export default function NewGoalPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    // Safeguard: re-check goal count limit before inserting
+    const { data: profile } = await supabase.from('profiles').select('is_premium').eq('id', user.id).single()
+    if (!profile?.is_premium) {
+      const { count } = await supabase.from('goals').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+      if ((count ?? 0) >= 2) {
+        router.push('/goals')
+        return
+      }
+    }
+
     // Create goal
     const { data: goal, error: goalError } = await supabase
       .from('goals')

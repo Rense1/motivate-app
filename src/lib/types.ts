@@ -38,7 +38,18 @@ export interface MilestoneReason {
   order_index: number
 }
 
-export type TaskFrequency = 'daily' | 'weekly' | 'none'
+export type TaskFrequency =
+  | 'daily'
+  | 'weekly'
+  | 'none'
+  | 'weekly_2'      // Premium: 毎週2回
+  | 'every_3_days'  // Premium: 3日に1回
+  | 'monthly_n'     // Premium: 毎月n回
+
+/** Premium専用の頻度かどうか */
+export const PREMIUM_FREQUENCIES: TaskFrequency[] = ['weekly_2', 'every_3_days', 'monthly_n']
+export const isPremiumFrequency = (f: TaskFrequency): boolean =>
+  (PREMIUM_FREQUENCIES as string[]).includes(f)
 
 export interface Task {
   id: string
@@ -46,6 +57,12 @@ export interface Task {
   title: string
   is_daily: boolean
   frequency: TaskFrequency
+  /** monthly_n 頻度で使う月間目標回数 */
+  monthly_count: number | null
+  /** 現在の期間（週 or 月）内の完了数 */
+  period_done_count: number
+  /** period_done_count のカウント開始日 */
+  period_start: string | null
   order_index: number
   is_completed_today: boolean
   last_completed_at: string | null

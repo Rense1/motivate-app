@@ -6,17 +6,25 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Plus, Trash2, ChevronRight, Crown } from 'lucide-react'
 import { useCrownCount } from '@/lib/useCrownCount'
+import { usePremium } from '@/lib/usePremium'
+import PremiumModal from '@/components/ui/PremiumModal'
+import { useRouter } from 'next/navigation'
 
 type GoalWithMilestones = Goal & { milestones: Milestone[] }
+
+const FREE_GOAL_LIMIT = 2
 
 export default function GoalsClient() {
   const [goals, setGoals] = useState<GoalWithMilestones[]>([])
   const [loading, setLoading] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [premiumModalOpen, setPremiumModalOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const supabase = createClient()
   const crownCount = useCrownCount()
+  const isPremium = usePremium()
+  const router = useRouter()
 
   useEffect(() => {
     async function fetchData() {
@@ -53,6 +61,14 @@ export default function GoalsClient() {
     return () => container.removeEventListener('scroll', updateActiveIndex)
   }, [goals, updateActiveIndex])
 
+  function handleAddGoal() {
+    if (isPremium === false && goals.length >= FREE_GOAL_LIMIT) {
+      setPremiumModalOpen(true)
+      return
+    }
+    router.push('/goals/new')
+  }
+
   async function deleteGoal(id: string) {
     if (!confirm('この目標を削除しますか？')) return
     await supabase.from('goals').delete().eq('id', id)
@@ -74,25 +90,25 @@ export default function GoalsClient() {
           )}
           <h1 className="text-2xl font-bold text-gray-900">目標一覧</h1>
         </div>
-        <Link
-          href="/goals/new"
+        <button
+          onClick={handleAddGoal}
           className="bg-red-600 text-white rounded-2xl px-4 py-2 flex items-center gap-1.5 text-sm font-bold shadow-sm"
         >
           <Plus className="w-4 h-4" />
           追加
-        </Link>
+        </button>
       </div>
 
       {goals.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center pb-20">
           <p className="text-gray-400 mb-6">まだ目標がありません</p>
-          <Link
-            href="/goals/new"
+          <button
+            onClick={handleAddGoal}
             className="bg-red-600 text-white px-6 py-3 rounded-2xl font-semibold inline-flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
             最初の目標を作る
-          </Link>
+          </button>
         </div>
       ) : (
         <div
@@ -198,6 +214,12 @@ export default function GoalsClient() {
           ))}
         </div>
       )}
+
+      <PremiumModal
+        isOpen={premiumModalOpen}
+        onClose={() => setPremiumModalOpen(false)}
+        featureName="3つ目以降の目標追加"
+      />
     </div>
   )
 }

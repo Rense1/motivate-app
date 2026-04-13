@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types'
 import { Camera, Check, Gem, LogOut, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import PremiumModal from '@/components/ui/PremiumModal'
 
 export default function SettingsClient() {
   const supabase = createClient()
@@ -209,54 +210,10 @@ export default function SettingsClient() {
         </div>
       </div>
 
-      {/* Premium modal */}
-      {premiumModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8"
-          onClick={() => setPremiumModalOpen(false)}
-        >
-          <div
-            className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-yellow-400 rounded-full p-1.5">
-                  <Gem className="w-4 h-4 text-white" />
-                </div>
-                <h2 className="text-base font-bold text-gray-800">プレミアムプラン</h2>
-              </div>
-              <button onClick={() => setPremiumModalOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            <div className="space-y-3 mb-6">
-              {[
-                { icon: '🎯', label: '複数目標の同時管理' },
-                { icon: '📱', label: 'ホーム画面ウィジェットで目標を常に表示' },
-                { icon: '📊', label: '詳細な進捗分析レポート' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-3">
-                  <span className="text-xl">{item.icon}</span>
-                  <p className="text-sm text-gray-700">{item.label}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center mb-4">
-              <p className="text-yellow-700 font-bold text-sm">🚀 近日公開予定</p>
-              <p className="text-yellow-600 text-xs mt-1">サブスクリプション機能を準備中です</p>
-            </div>
-            <button
-              onClick={() => setPremiumModalOpen(false)}
-              className="w-full bg-gray-100 text-gray-600 py-3 rounded-2xl font-semibold text-sm"
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
+      <PremiumModal
+        isOpen={premiumModalOpen}
+        onClose={() => setPremiumModalOpen(false)}
+      />
     </div>
   )
 }

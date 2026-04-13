@@ -20,7 +20,15 @@ function deriveTasks(g: GoalWithData): (Task & { milestone: Milestone })[] {
       ?.filter((m: any) => !m.is_achieved)
       .flatMap((m: any) =>
         (m.tasks || [])
-          .filter((t: any) => shouldShowInToday(t.frequency ?? (t.is_daily ? 'daily' : 'none')))
+          .filter((t: any) =>
+            shouldShowInToday(
+              t.frequency ?? (t.is_daily ? 'daily' : 'none'),
+              t.last_completed_at,
+              t.period_done_count,
+              t.period_start,
+              t.monthly_count,
+            )
+          )
           .map((t: any) => ({
             ...t,
             is_completed_today: isCompletedToday(t.last_completed_at),

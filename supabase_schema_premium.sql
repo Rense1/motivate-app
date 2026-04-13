@@ -3,6 +3,33 @@
 -- Run this in Supabase SQL Editor after the base schema
 -- ============================================================
 
+-- ============================================================
+-- Premium frequency extension (run after supabase_schema_frequency.sql)
+-- ============================================================
+
+-- Extend frequency check to support premium frequency values
+ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_frequency_check;
+ALTER TABLE tasks
+  ADD CONSTRAINT tasks_frequency_check
+  CHECK (frequency IN ('daily', 'weekly', 'none', 'weekly_2', 'every_3_days', 'monthly_n'));
+
+-- monthly_count: target completions per month (used with monthly_n)
+ALTER TABLE tasks
+  ADD COLUMN IF NOT EXISTS monthly_count INTEGER DEFAULT 1
+  CHECK (monthly_count >= 1 AND monthly_count <= 31);
+
+-- period_done_count: completions in the current tracking period
+ALTER TABLE tasks
+  ADD COLUMN IF NOT EXISTS period_done_count INTEGER DEFAULT 0;
+
+-- period_start: start date of the period stored in period_done_count
+ALTER TABLE tasks
+  ADD COLUMN IF NOT EXISTS period_start DATE;
+
+-- ============================================================
+-- User profiles table (extends auth.users)
+-- ============================================================
+
 -- User profiles table (extends auth.users)
 CREATE TABLE profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,

@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Milestone } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
-import { Lock, Crown, CheckCircle2, Key } from 'lucide-react'
+import { Lock, LockOpen, Crown, CheckCircle2, Key } from 'lucide-react'
 import { deadlineBadge } from '@/lib/taskUtils'
 import { getMilestoneRank, isMilestoneLocked, RANK_META, RANK_BG } from '@/lib/progressUtils'
 import { useRouter } from 'next/navigation'
@@ -125,8 +125,15 @@ export default function MilestoneRoadmap({
   // ── アニメーション状態管理 ──────────────────────────────────────────
   /** カードポップアニメーション中のマイルストーン ID */
   const [poppingId, setPoppingId] = useState<string | null>(null)
-  /** ロック解除アニメーション中のマイルストーン ID */
-  const [unlockingId, setUnlockingId] = useState<string | null>(null)
+  /**
+   * ロック解除アニメーションフェーズ
+   *   phase 1: 閉じた鍵 → 開いた鍵（LockOpen アイコンに切替）
+   *   phase 2: オーバーレイがスライドダウンしてカードが現れる
+   */
+  const [unlockPhase, setUnlockPhase] = useState<{
+    milestoneId: string
+    phase: 1 | 2
+  } | null>(null)
   /** 解除後グロー中のマイルストーン ID */
   const [glowingId, setGlowingId] = useState<string | null>(null)
   /** 新着達成スタンプを表示中のマイルストーン ID セット */
@@ -138,6 +145,8 @@ export default function MilestoneRoadmap({
   const achieveBtnRefs = useRef<(HTMLButtonElement | null)[]>([])
   const crownCounterRef = useRef<HTMLDivElement>(null)
   const goalAchieveBtnRef = useRef<HTMLButtonElement>(null)
+  /** ゴールカードの王冠アイコン（最終達成アニメーションの起点） */
+  const goalCrownIconRef = useRef<HTMLDivElement>(null)
 
   // ── やる理由の先頭文キャッシュ ───────────────────────────────────────
   const [firstReasonMap, setFirstReasonMap] = useState<Record<string, string>>({})
@@ -256,10 +265,17 @@ export default function MilestoneRoadmap({
     const newVal = !milestone.is_achieved
 
     if (newVal) {
-      // ── 即時 UI フィードバック ────────────────────────────────────
+      // ── 即時 UI フィードバック（DB 更新前に実行） ────────────────
       haptic.medium()
       setPoppingId(milestone.id)
       setTimeout(() => setPoppingId(null), 420)
+
+      // ロック解除: Phase 1「閉じた鍵 → 開いた鍵」を DB 更新前に開始
+      // （locked フラグが false になる前にアニメーションを先行表示するため）
+      if (originalIndex + 1 < total) {
+        const nextId = milestones[originalIndex + 1].id
+        setUnlockPhase({ milestoneId: nextId, phase: 1 })
+      }
     }
 
     await supabase
@@ -267,23 +283,22 @@ export default function MilestoneRoadmap({
       .update({ is_achieved: newVal, achieved_at: newVal ? new Date().toISOString() : null })
       .eq('id', milestone.id)
 
+    // この呼び出しで親の milestones が更新され、次カードの locked が false になる
     onMilestoneUpdate(milestone.id, {
       is_achieved: newVal,
       achieved_at: newVal ? new Date().toISOString() : null,
     })
 
     if (newVal) {
-      const newAchievedCount = milestones.filter((m) => m.is_achieved).length + 1
-      const isFinal = newAchievedCount >= total
-
       const buttonRect = btnEl?.getBoundingClientRect() ?? null
       const crownRect = crownCounterRef.current?.getBoundingClientRect() ?? null
 
+      // 通常達成アニメーション（isFinal は常に false。王冠獲得はゴールカードボタン専用）
       if (buttonRect) {
         pushAnimation({
           type: 'achievement',
           milestoneId: milestone.id,
-          isFinal,
+          isFinal: false,
           buttonRect,
           crownCounterRect: crownRect,
         })
@@ -299,27 +314,23 @@ export default function MilestoneRoadmap({
         })
       }, 1800)
 
-      // ── 次マイルストーンのロック解除アニメーション ────────────────
+      // ── ロック解除フェーズ管理 ────────────────────────────────────
       if (originalIndex + 1 < total) {
-        const nextMilestone = milestones[originalIndex + 1]
-        // ロック破壊（650ms）
-        setUnlockingId(nextMilestone.id)
+        const nextId = milestones[originalIndex + 1].id
+        // Phase 1（420ms）→ Phase 2（スライドアウト 520ms）→ グロー（1300ms）
         setTimeout(() => {
-          setUnlockingId(null)
-          // グロー（1.3s）
-          setGlowingId(nextMilestone.id)
-          setTimeout(() => setGlowingId(null), 1300)
-        }, 680)
+          setUnlockPhase({ milestoneId: nextId, phase: 2 })
+          setTimeout(() => {
+            setUnlockPhase(null)
+            setGlowingId(nextId)
+            setTimeout(() => setGlowingId(null), 1300)
+          }, 540)
+        }, 420)
       }
 
       // ── 達成後に次のカードへスムーズスクロール ────────────────────
-      const nextVI = total - originalIndex - 1 // 次のマイルストーン or 0（ゴールカード）
-      setTimeout(() => scrollToCardAtVI(Math.max(0, nextVI)), 520)
-
-      // 全達成時はゴールカードへスクロール
-      if (isFinal) {
-        setTimeout(() => scrollToCardAtVI(0), 2800)
-      }
+      const nextVI = total - originalIndex - 1
+      setTimeout(() => scrollToCardAtVI(Math.max(0, nextVI)), 560)
     }
   }
 
@@ -328,14 +339,20 @@ export default function MilestoneRoadmap({
     if (goalCardTriggered) return
     haptic.heavy()
     setGoalCardTriggered(true)
-    const buttonRect = btnEl?.getBoundingClientRect() ?? null
+
+    // アニメーションの起点: カード右上の王冠アイコン位置を優先使用
+    // （仕様: 王冠が右上から手前に出てくる演出）
+    const crownIconRect = goalCrownIconRef.current?.getBoundingClientRect() ?? null
+    const fallbackRect = btnEl?.getBoundingClientRect() ?? null
+    const animRect = crownIconRect ?? fallbackRect
     const crownRect = crownCounterRef.current?.getBoundingClientRect() ?? null
-    if (buttonRect) {
+
+    if (animRect) {
       pushAnimation({
         type: 'achievement',
         milestoneId: 'goal-final',
         isFinal: true,
-        buttonRect,
+        buttonRect: animRect,
         crownCounterRect: crownRect,
       })
     }
@@ -454,7 +471,9 @@ export default function MilestoneRoadmap({
                     <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)' }}>
                       最終目標
                     </span>
+                    {/* 王冠アイコン: ゴール達成アニメーションの起点として ref を保持 */}
                     <motion.div
+                      ref={goalCrownIconRef}
                       animate={hasCrown ? { rotate: [0, -12, 12, -8, 0], scale: [1, 1.2, 1] } : {}}
                       transition={{ duration: 0.6, delay: 0.1 }}
                     >
@@ -545,10 +564,17 @@ export default function MilestoneRoadmap({
             const locked = isMilestoneLocked(originalIndex, milestones)
             const isActive = visualIndex === activeIndex
             const isPopping = poppingId === milestone.id
-            const isUnlocking = unlockingId === milestone.id
             const isGlowing = glowingId === milestone.id
             const isNewlyAchieved = newlyAchievedIds.has(milestone.id)
             const meta = RANK_META[rank]
+
+            // ── ロック解除フェーズ ──────────────────────────────────
+            // locked が false になった後も unlockPhase が設定されている間はオーバーレイを維持する
+            const isPhase1 = unlockPhase?.milestoneId === milestone.id && unlockPhase.phase === 1
+            const isPhase2 = unlockPhase?.milestoneId === milestone.id && unlockPhase.phase === 2
+            const isUnlockActive = isPhase1 || isPhase2
+            // locked=false になっても解除アニメーション中はオーバーレイを表示し続ける
+            const showLockOverlay = locked || isUnlockActive
 
             const bgColor = milestone.is_achieved ? '#15803d' : locked ? '#1f2937' : RANK_BG[rank]
 
@@ -711,56 +737,61 @@ export default function MilestoneRoadmap({
                         </p>
                       </div>
 
-                      {/* ── ロックオーバーレイ（解錠時にアニメーション）─ */}
+                      {/* ── ロックオーバーレイ ──────────────────────────
+                       *  showLockOverlay: locked=true の間 + 解除アニメーション中も表示を維持
+                       *  Phase 1: 閉じた鍵 → 開いた鍵（LockOpen アイコン）
+                       *  Phase 2: オーバーレイがスライドダウンしてカードが現れる
+                       * ──────────────────────────────────────────────── */}
                       <AnimatePresence>
-                        {locked && (
+                        {showLockOverlay && (
                           <motion.div
-                            key="lock-overlay"
-                            initial={{ opacity: 1 }}
-                            animate={isUnlocking ? { opacity: 0 } : { opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.55, ease: 'easeOut', delay: isUnlocking ? 0.35 : 0 }}
-                            className="absolute inset-0 flex items-center justify-center"
+                            key={`lock-overlay-${milestone.id}`}
+                            initial={{ y: 0 }}
+                            animate={{
+                              // Phase 2: 下方向へスライドアウト
+                              y: isPhase2 ? '108%' : 0,
+                            }}
+                            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                            transition={{ duration: 0.48, ease: [0.4, 0, 0.2, 1] }}
+                            className="absolute inset-0 flex items-center justify-center overflow-hidden"
                             style={{ background: 'rgba(0,0,0,0.72)', borderRadius: 28 }}
                           >
-                            <motion.div
-                              animate={
-                                isUnlocking
-                                  ? {
-                                      scale: [1, 0.85, 1.5, 1.8, 0],
-                                      rotate: [0, -18, 24, 48, 72],
-                                      opacity: [1, 1, 0.7, 0.3, 0],
-                                      filter: [
-                                        'brightness(1)',
-                                        'brightness(1)',
-                                        'brightness(3)',
-                                        'brightness(4)',
-                                        'brightness(1)',
-                                      ],
-                                    }
-                                  : { scale: 1, rotate: 0, opacity: 1 }
-                              }
-                              transition={{
-                                duration: 0.62,
-                                times: isUnlocking ? [0, 0.18, 0.45, 0.72, 1] : undefined,
-                                ease: 'easeOut',
-                              }}
-                            >
-                              <Lock
-                                className="w-12 h-12"
-                                style={{ color: 'rgba(255,255,255,0.55)' }}
-                              />
-                            </motion.div>
-                            {/* ロック破壊フラッシュ */}
-                            {isUnlocking && (
-                              <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: [0, 0.5, 0] }}
-                                transition={{ duration: 0.4, delay: 0.25, times: [0, 0.3, 1] }}
-                                className="absolute inset-0"
-                                style={{ background: 'white', borderRadius: 28 }}
-                              />
-                            )}
+                            {/* 鍵アイコン: Phase 1 で closed → open に入れ替わる */}
+                            <AnimatePresence mode="wait">
+                              {isPhase1 ? (
+                                // 開いた鍵（解放！）
+                                <motion.div
+                                  key="lock-open"
+                                  initial={{ scale: 0.5, opacity: 0, rotate: -25 }}
+                                  animate={{ scale: 1.15, opacity: 1, rotate: 0 }}
+                                  exit={{ scale: 0.7, opacity: 0, transition: { duration: 0.18 } }}
+                                  transition={{
+                                    type: 'spring',
+                                    stiffness: 420,
+                                    damping: 16,
+                                    duration: 0.35,
+                                  }}
+                                >
+                                  <LockOpen
+                                    className="w-12 h-12"
+                                    style={{ color: 'rgba(255,255,255,0.90)' }}
+                                  />
+                                </motion.div>
+                              ) : (
+                                // 閉じた鍵（通常のロック状態）
+                                <motion.div
+                                  key="lock-closed"
+                                  initial={{ scale: 1, opacity: 1 }}
+                                  exit={{ scale: 0.8, opacity: 0, transition: { duration: 0.18 } }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                >
+                                  <Lock
+                                    className="w-12 h-12"
+                                    style={{ color: 'rgba(255,255,255,0.55)' }}
+                                  />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </motion.div>
                         )}
                       </AnimatePresence>
