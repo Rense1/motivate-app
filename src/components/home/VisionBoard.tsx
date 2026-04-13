@@ -3,19 +3,17 @@
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Goal } from '@/lib/types'
-import { ImagePlus, Edit2, Check, Crown, X } from 'lucide-react'
+import { ImagePlus, Edit2, Check } from 'lucide-react'
 
 interface VisionBoardProps {
   goal: Goal
   onUpdate: (updated: Partial<Goal>) => void
-  isPremium: boolean
 }
 
-export default function VisionBoard({ goal, onUpdate, isPremium }: VisionBoardProps) {
+export default function VisionBoard({ goal, onUpdate }: VisionBoardProps) {
   const [editingText, setEditingText] = useState(false)
   const [text, setText] = useState(goal.vision_text || '')
   const [uploading, setUploading] = useState(false)
-  const [premiumModalOpen, setPremiumModalOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -97,19 +95,17 @@ export default function VisionBoard({ goal, onUpdate, isPremium }: VisionBoardPr
         )}
       </div>
 
-      {/* Upload button — premium only */}
+      {/* Upload button — free for all users */}
       <button
-        onClick={() => isPremium ? fileRef.current?.click() : setPremiumModalOpen(true)}
+        onClick={() => fileRef.current?.click()}
         disabled={uploading}
         className="absolute top-3 right-3 bg-white/80 backdrop-blur rounded-full p-2 shadow"
-        aria-label={isPremium ? '画像をアップロード' : 'プレミアム限定機能'}
+        aria-label="画像をアップロード"
       >
         {uploading ? (
           <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-        ) : isPremium ? (
-          <ImagePlus className="w-5 h-5 text-red-600" />
         ) : (
-          <Crown className="w-5 h-5 text-yellow-500" />
+          <ImagePlus className="w-5 h-5 text-red-600" />
         )}
       </button>
 
@@ -120,44 +116,6 @@ export default function VisionBoard({ goal, onUpdate, isPremium }: VisionBoardPr
         className="hidden"
         onChange={handleImageUpload}
       />
-
-      {/* Premium upsell modal */}
-      {premiumModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8"
-          onClick={() => setPremiumModalOpen(false)}
-        >
-          <div
-            className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-yellow-400 rounded-full p-1.5">
-                  <Crown className="w-4 h-4 text-white" />
-                </div>
-                <h2 className="text-base font-bold text-gray-800">プレミアムプラン</h2>
-              </div>
-              <button onClick={() => setPremiumModalOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-            <p className="text-gray-600 text-sm mb-6">
-              <span className="font-semibold text-gray-800">ビジョン画像のアップロード</span> はプレミアムプランの機能です。プレミアムでは画像でモチベーションを高め、複数ゴールも管理できます。
-            </p>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center mb-4">
-              <p className="text-yellow-700 font-bold text-sm">🚀 近日公開予定</p>
-              <p className="text-yellow-600 text-xs mt-1">サブスクリプション機能を準備中です</p>
-            </div>
-            <button
-              onClick={() => setPremiumModalOpen(false)}
-              className="w-full bg-gray-100 text-gray-600 py-3 rounded-2xl font-semibold text-sm"
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

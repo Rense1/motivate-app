@@ -1,24 +1,62 @@
 'use client'
 
-import { useState } from 'react'
-import { Goal, Milestone, Task, Profile } from '@/lib/types'
+import { useState, useEffect } from 'react'
+import { Goal, Milestone, Task } from '@/lib/types'
 import VisionBoard from '@/components/home/VisionBoard'
 import TodayTaskList from '@/components/home/TodayTaskList'
 import MilestoneProgress from '@/components/home/MilestoneProgress'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { isCompletedToday, shouldShowInToday } from '@/lib/taskUtils'
 
-interface HomeClientProps {
-  goal: Goal | null
-  todayTasks: (Task & { milestone: Milestone })[]
-  milestones: Milestone[]
-  isPremium: boolean
-}
+export default function HomeClient() {
+  const [goal, setGoal] = useState<Goal | null>(null)
+  const [todayTasks, setTodayTasks] = useState<(Task & { milestone: Milestone })[]>([])
+  const [milestones, setMilestones] = useState<Milestone[]>([])
+  const [isPremium, setIsPremium] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-export default function HomeClient({ goal: initialGoal, todayTasks: initialTasks, milestones: initialMilestones, isPremium }: HomeClientProps) {
-  const [goal, setGoal] = useState(initialGoal)
-  const [todayTasks, setTodayTasks] = useState(initialTasks)
-  const [milestones, setMilestones] = useState(initialMilestones)
+  useEffect(() => {
+    async function fetchData() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const [{ data: goals }, { data: profile }] = await Promise.all([
+        supabase
+          .from('goals')
+          .select('*, milestones(*, tasks(*))')
+          .eq('user_id', user.id)
+          .order('created_at')
+          .limit(1),
+        supabase.from('profiles').select('is_premium').eq('id', user.id).single(),
+      ])
+
+      const g = goals?.[0] || null
+      setGoal(g)
+      setIsPremium(profile?.is_premium ?? false)
+
+      if (g) {
+        const tasks = g.milestones
+          ?.filter((m: any) => !m.is_achieved)
+          .flatMap((m: any) =>
+            (m.tasks || [])
+              .filter((t: any) => shouldShowInToday(t.frequency ?? (t.is_daily ? 'daily' : 'none')))
+              .map((t: any) => ({
+                ...t,
+                is_completed_today: isCompletedToday(t.last_completed_at),
+                milestone: m,
+              }))
+          )
+          .slice(0, 5) || []
+        setTodayTasks(tasks)
+        setMilestones(g.milestones?.sort((a: any, b: any) => a.order_index - b.order_index) || [])
+      }
+      setLoading(false)
+    }
+    fetchData()
+  }, [])
 
   function handleGoalUpdate(updates: Partial<Goal>) {
     setGoal(prev => prev ? { ...prev, ...updates } : prev)
@@ -27,6 +65,9 @@ export default function HomeClient({ goal: initialGoal, todayTasks: initialTasks
   function handleTaskToggle(taskId: string, completed: boolean) {
     setTodayTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed_today: completed } : t))
   }
+
+  // loading.tsx skeleton is shown by Suspense until this returns non-null
+  if (loading) return null
 
   if (!goal) {
     return (
@@ -49,23 +90,18 @@ export default function HomeClient({ goal: initialGoal, todayTasks: initialTasks
 
   return (
     <div className="page-enter p-4 space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-xl font-bold text-gray-800">{goal.title}</h1>
         <Link href="/goals" className="text-red-600 text-sm font-medium">目標一覧</Link>
-
       </div>
 
-      {/* Vision Board */}
-      <VisionBoard goal={goal} onUpdate={handleGoalUpdate} isPremium={isPremium} />
+      <VisionBoard goal={goal} onUpdate={handleGoalUpdate} />
 
-      {/* Tasks + Milestone Progress */}
       <div className="grid grid-cols-2 gap-3" style={{ height: '280px' }}>
         <TodayTaskList tasks={todayTasks} onTaskToggle={handleTaskToggle} />
         <MilestoneProgress milestones={milestones} goalId={goal.id} />
       </div>
 
-      {/* Quick link to milestones */}
       <Link
         href={`/milestones/${goal.id}`}
         className="block bg-red-600 text-white text-center py-4 rounded-2xl font-semibold"

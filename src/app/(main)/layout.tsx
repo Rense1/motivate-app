@@ -1,12 +1,26 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/ui/BottomNav'
 
-export default async function MainLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export default function MainLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const [ready, setReady] = useState(false)
 
-  if (!user) redirect('/login')
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        router.replace('/login')
+      } else {
+        setReady(true)
+      }
+    })
+  }, [])
+
+  if (!ready) return null
 
   return (
     <div className="min-h-screen bg-gray-100 max-w-md mx-auto relative">

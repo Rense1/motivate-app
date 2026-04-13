@@ -1,24 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
 import TasksClient from './TasksClient'
-import { notFound } from 'next/navigation'
 
-export default async function TasksPage({ params }: { params: Promise<{ id: string; milestoneId: string }> }) {
-  const { id, milestoneId } = await params
-  const supabase = await createClient()
+// Static export: dynamicParams must be false.
+// A placeholder is generated so the build succeeds; real IDs are resolved
+// client-side via useParams() in TasksClient — no actual navigation to '_'.
+export const dynamicParams = false
 
-  const { data: milestone } = await supabase
-    .from('milestones')
-    .select('*')
-    .eq('id', milestoneId)
-    .single()
+export function generateStaticParams() {
+  // Placeholder covering both segments so the build succeeds.
+  // Real IDs are resolved client-side via useParams() in TasksClient.
+  return [{ id: '_', milestoneId: '_' }]
+}
 
-  if (!milestone) notFound()
-
-  const { data: tasks } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('milestone_id', milestoneId)
-    .order('order_index')
-
-  return <TasksClient goalId={id} milestone={milestone} tasks={tasks || []} />
+export default function TasksPage() {
+  return <TasksClient />
 }

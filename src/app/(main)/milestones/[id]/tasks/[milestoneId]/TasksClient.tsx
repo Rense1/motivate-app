@@ -1,29 +1,51 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Milestone, Task, TaskFrequency } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import TaskCard from '@/components/task/TaskCard'
 import { ChevronLeft, Plus, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import Modal from '@/components/ui/Modal'
+import { useParams, useRouter } from 'next/navigation'
 
-interface TasksClientProps {
-  goalId: string
-  milestone: Milestone
-  tasks: Task[]
-}
+export default function TasksClient() {
+  const params = useParams()
+  const goalId = params.id as string
+  const milestoneId = params.milestoneId as string
+  const router = useRouter()
+  const supabase = createClient()
 
-export default function TasksClient({ goalId, milestone, tasks: initialTasks }: TasksClientProps) {
-  const [tasks, setTasks] = useState(initialTasks)
+  const [milestone, setMilestone] = useState<Milestone | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+
   const [addOpen, setAddOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newFrequency, setNewFrequency] = useState<TaskFrequency>('daily')
   const [adding, setAdding] = useState(false)
-  const [deadline, setDeadline] = useState(milestone.deadline || '')
+
+  const [deadline, setDeadline] = useState('')
   const [savingDeadline, setSavingDeadline] = useState(false)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
-  const supabase = createClient()
+
+  useEffect(() => {
+    if (!milestoneId) return
+    async function fetchData() {
+      const { data: ms } = await supabase
+        .from('milestones').select('*').eq('id', milestoneId).single()
+      if (!ms) { router.replace(`/milestones/${goalId}`); return }
+
+      const { data: tasks } = await supabase
+        .from('tasks').select('*').eq('milestone_id', milestoneId).order('order_index')
+
+      setMilestone(ms)
+      setDeadline(ms.deadline || '')
+      setTasks(tasks || [])
+      setLoading(false)
+    }
+    fetchData()
+  }, [milestoneId])
 
   async function addTask() {
     if (!newTitle.trim()) return
@@ -31,14 +53,13 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
     const { data, error } = await supabase
       .from('tasks')
       .insert({
-        milestone_id: milestone.id,
+        milestone_id: milestoneId,
         title: newTitle.trim(),
         is_daily: newFrequency === 'daily',
         frequency: newFrequency,
         order_index: tasks.length,
       })
-      .select()
-      .single()
+      .select().single()
 
     if (!error && data) {
       setTasks(prev => [...prev, data])
@@ -55,10 +76,12 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
 
   async function saveDeadline() {
     setSavingDeadline(true)
-    await supabase.from('milestones').update({ deadline: deadline || null }).eq('id', milestone.id)
+    await supabase.from('milestones').update({ deadline: deadline || null }).eq('id', milestoneId)
     setSavingDeadline(false)
     setDeadlineOpen(false)
   }
+
+  if (loading || !milestone) return null
 
   return (
     <div className="page-enter min-h-screen bg-gray-100">
@@ -76,7 +99,6 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Milestone circle */}
         <div className="flex flex-col items-center py-4">
           <div className="w-28 h-28 rounded-full bg-red-600 flex items-center justify-center shadow-lg">
             <span className="text-white text-sm font-bold text-center px-3 leading-tight">{milestone.title}</span>
@@ -88,14 +110,12 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
           )}
         </div>
 
-        {/* Connector */}
         {tasks.length > 0 && (
           <div className="flex justify-center">
             <div className="w-0.5 h-6 bg-red-300" />
           </div>
         )}
 
-        {/* Tasks */}
         <div className="space-y-3">
           {tasks.map((task, index) => (
             <div key={task.id} className="flex flex-col items-center">
@@ -109,7 +129,6 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
           ))}
         </div>
 
-        {/* Add task button */}
         <div className="flex flex-col items-center gap-2 pt-2">
           {tasks.length > 0 && <div className="w-0.5 h-4 bg-red-300" />}
           <button
@@ -140,7 +159,6 @@ export default function TasksClient({ goalId, milestone, tasks: initialTasks }: 
             placeholder="例：英語の本を10ページ読む"
             className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
-          {/* Frequency selector */}
           <div>
             <p className="text-xs text-gray-500 mb-2">頻度</p>
             <div className="flex gap-2">

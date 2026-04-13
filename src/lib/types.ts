@@ -2,6 +2,8 @@ export interface Profile {
   id: string
   is_premium: boolean
   premium_started_at: string | null
+  display_name: string | null
+  avatar_url: string | null
   created_at: string
 }
 

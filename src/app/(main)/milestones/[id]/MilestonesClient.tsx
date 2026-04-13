@@ -1,24 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Goal, Milestone } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import MilestoneRoadmap from '@/components/milestone/MilestoneRoadmap'
 import { ChevronLeft, Plus } from 'lucide-react'
 import Link from 'next/link'
 import Modal from '@/components/ui/Modal'
+import { useParams, useRouter } from 'next/navigation'
 
-interface MilestonesClientProps {
-  goal: Goal
-  milestones: Milestone[]
-}
+export default function MilestonesClient() {
+  const params = useParams()
+  const goalId = params.id as string
+  const router = useRouter()
+  const supabase = createClient()
 
-export default function MilestonesClient({ goal, milestones: initialMilestones }: MilestonesClientProps) {
-  const [milestones, setMilestones] = useState(initialMilestones)
+  const [goal, setGoal] = useState<Goal | null>(null)
+  const [milestones, setMilestones] = useState<Milestone[]>([])
   const [addOpen, setAddOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [adding, setAdding] = useState(false)
-  const supabase = createClient()
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!goalId) return
+    async function fetchData() {
+      const { data: goal } = await supabase
+        .from('goals').select('*').eq('id', goalId).single()
+      if (!goal) { router.replace('/goals'); return }
+
+      const { data: milestones } = await supabase
+        .from('milestones').select('*').eq('goal_id', goalId).order('order_index')
+
+      setGoal(goal)
+      setMilestones(milestones || [])
+      setLoading(false)
+    }
+    fetchData()
+  }, [goalId])
 
   function handleMilestoneUpdate(id: string, updates: Partial<Milestone>) {
     setMilestones(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m))
@@ -29,13 +48,8 @@ export default function MilestonesClient({ goal, milestones: initialMilestones }
     setAdding(true)
     const { data, error } = await supabase
       .from('milestones')
-      .insert({
-        goal_id: goal.id,
-        title: newTitle.trim(),
-        order_index: milestones.length,
-      })
-      .select()
-      .single()
+      .insert({ goal_id: goalId, title: newTitle.trim(), order_index: milestones.length })
+      .select().single()
 
     if (!error && data) {
       setMilestones(prev => [...prev, data])
@@ -45,11 +59,12 @@ export default function MilestonesClient({ goal, milestones: initialMilestones }
     setAdding(false)
   }
 
+  if (loading || !goal) return null
+
   const achieved = milestones.filter(m => m.is_achieved).length
 
   return (
     <div className="page-enter relative">
-      {/* Header */}
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-gray-200">
         <div className="flex items-center gap-2">
           <Link href="/" className="p-1.5 rounded-xl hover:bg-gray-100">
@@ -69,14 +84,12 @@ export default function MilestonesClient({ goal, milestones: initialMilestones }
         </button>
       </div>
 
-      {/* Roadmap */}
       <MilestoneRoadmap
         milestones={milestones}
-        goalId={goal.id}
+        goalId={goalId}
         onMilestoneUpdate={handleMilestoneUpdate}
       />
 
-      {/* Add milestone modal */}
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="マイルストーンを追加">
         <div className="space-y-4">
           <input

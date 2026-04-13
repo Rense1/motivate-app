@@ -70,7 +70,7 @@ export default function PremiumLock({ children, isPremium, featureName = 'この
               <span className="font-semibold text-gray-800">{featureName}</span> はプレミアムプランの機能です。
             </p>
             <p className="text-gray-500 text-sm mb-6">
-              プレミアムプランでは、ビジョン画像のアップロードや複数ゴールの作成など、目標達成をさらに加速する機能が使えます。
+              プレミアムプランでは、複数目標の同時管理やスマホのホーム画面に目標を表示できるウィジェット機能など、目標達成をさらに加速する機能が使えます。
             </p>
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center mb-4">
