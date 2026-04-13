@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Task, TaskReason } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import TaskReasonModal from './TaskReasonModal'
-import { Trash2, GripVertical } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { frequencyLabel } from '@/lib/taskUtils'
 
 interface TaskCardProps {
@@ -15,19 +15,16 @@ interface TaskCardProps {
 export default function TaskCard({ task, onDelete }: TaskCardProps) {
   const [reasonModalOpen, setReasonModalOpen] = useState(false)
   const [reasons, setReasons] = useState<TaskReason[]>([])
-  const [loadingReasons, setLoadingReasons] = useState(false)
   const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
   const supabase = createClient()
 
   async function openReasons() {
-    setLoadingReasons(true)
     const { data } = await supabase
       .from('task_reasons')
       .select('*')
       .eq('task_id', task.id)
       .order('order_index')
     setReasons(data || [])
-    setLoadingReasons(false)
     setReasonModalOpen(true)
   }
 
@@ -49,7 +46,13 @@ export default function TaskCard({ task, onDelete }: TaskCardProps) {
   return (
     <>
       <div
-        className="bg-red-600 rounded-2xl p-4 flex items-center gap-3 select-none cursor-pointer active:scale-95 transition-transform"
+        className="w-full select-none active:scale-98 transition-transform"
+        style={{
+          borderRadius: 20,
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #f87171 0%, #dc2626 60%, #b91c1c 100%)',
+          boxShadow: '0 4px 16px rgba(185,28,28,0.18)',
+        }}
         onMouseDown={startLongPress}
         onMouseUp={cancelLongPress}
         onMouseLeave={cancelLongPress}
@@ -57,20 +60,22 @@ export default function TaskCard({ task, onDelete }: TaskCardProps) {
         onTouchEnd={cancelLongPress}
         onTouchCancel={cancelLongPress}
       >
-        <GripVertical className="w-5 h-5 text-red-400 flex-shrink-0" />
-        <div className="flex-1 text-center">
-          <p className="text-white text-sm font-medium">{task.title}</p>
-          <span className="inline-block bg-red-500 text-red-100 text-xs px-2 py-0.5 rounded-full mt-1">
-            {frequencyLabel(task.frequency ?? (task.is_daily ? 'daily' : 'none'))}
-          </span>
+        <div className="px-5 py-4 flex items-center gap-3">
+          <div className="flex-1">
+            <p className="text-white font-semibold text-base leading-snug">{task.title}</p>
+            <span className="inline-block bg-white/20 text-white/90 text-xs font-medium px-2.5 py-0.5 rounded-full mt-1.5">
+              {frequencyLabel(task.frequency ?? (task.is_daily ? 'daily' : 'none'))}
+            </span>
+          </div>
+          <button
+            onClick={e => { e.stopPropagation(); handleDelete() }}
+            onMouseDown={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
+            className="p-1.5 text-white/50 hover:text-white transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={e => { e.stopPropagation(); handleDelete() }}
-          onMouseDown={e => e.stopPropagation()}
-          className="text-red-300 hover:text-white"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
       </div>
 
       <TaskReasonModal

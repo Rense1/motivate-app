@@ -36,7 +36,6 @@ export default function GoalsClient() {
     fetchData()
   }, [])
 
-  // Find which card is closest to the center of the scroll container
   const updateActiveIndex = useCallback(() => {
     const container = containerRef.current
     if (!container) return
@@ -59,7 +58,6 @@ export default function GoalsClient() {
     const container = containerRef.current
     if (!container) return
     container.addEventListener('scroll', updateActiveIndex, { passive: true })
-    // Init on mount
     updateActiveIndex()
     return () => container.removeEventListener('scroll', updateActiveIndex)
   }, [goals, updateActiveIndex])
@@ -75,14 +73,14 @@ export default function GoalsClient() {
   if (loading) return null
 
   return (
-    <div className="page-enter flex flex-col h-screen">
+    <div className="page-enter flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3 flex-shrink-0">
-        <h1 className="text-xl font-bold text-gray-800">目標一覧</h1>
+      <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+        <h1 className="text-2xl font-bold text-gray-900">目標一覧</h1>
         {canAddGoal ? (
           <Link
             href="/goals/new"
-            className="bg-red-600 text-white rounded-xl px-4 py-2 flex items-center gap-1 text-sm font-semibold"
+            className="bg-red-600 text-white rounded-2xl px-4 py-2 flex items-center gap-1.5 text-sm font-bold shadow-sm"
           >
             <Plus className="w-4 h-4" />
             追加
@@ -90,7 +88,7 @@ export default function GoalsClient() {
         ) : (
           <button
             onClick={() => setPremiumModalOpen(true)}
-            className="bg-yellow-400 text-white rounded-xl px-4 py-2 flex items-center gap-1 text-sm font-semibold"
+            className="bg-yellow-400 text-white rounded-2xl px-4 py-2 flex items-center gap-1.5 text-sm font-bold shadow-sm"
           >
             <Crown className="w-4 h-4" />
             追加
@@ -110,14 +108,13 @@ export default function GoalsClient() {
           </Link>
         </div>
       ) : (
-        /* Scroll container — center-emphasis carousel */
         <div
           ref={containerRef}
-          className="flex-1 overflow-y-scroll pb-24"
+          className="flex-1 overflow-y-scroll"
           style={{ scrollSnapType: 'y mandatory', scrollbarWidth: 'none' }}
         >
-          {/* Top spacer so first card can reach center */}
-          <div style={{ height: 'calc(50vh - 160px)', flexShrink: 0 }} />
+          {/* Top spacer: first card can scroll to center */}
+          <div style={{ height: 'calc(50vh - 200px)', flexShrink: 0 }} />
 
           {goals.map((goal, index) => {
             const total = goal.milestones?.length || 0
@@ -129,53 +126,76 @@ export default function GoalsClient() {
               <div
                 key={goal.id}
                 ref={el => { cardRefs.current[index] = el }}
-                className="px-4 mb-4"
+                className="px-5 mb-5"
                 style={{ scrollSnapAlign: 'center' }}
               >
                 <div
                   style={{
-                    transform: isActive ? 'scale(1.03)' : 'scale(0.93)',
-                    opacity: isActive ? 1 : 0.6,
-                    transition: 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease, box-shadow 0.35s ease',
+                    transform: isActive ? 'scale(1.0) translateY(0px)' : 'scale(0.88) translateY(0px)',
+                    opacity: isActive ? 1 : 0.55,
+                    transition: 'transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease, box-shadow 0.4s ease',
                     boxShadow: isActive
-                      ? '0 24px 60px rgba(185,28,28,0.25), 0 8px 24px rgba(0,0,0,0.12)'
-                      : '0 4px 16px rgba(0,0,0,0.08)',
+                      ? '0 32px 64px rgba(185,28,28,0.30), 0 12px 32px rgba(0,0,0,0.15)'
+                      : '0 4px 16px rgba(0,0,0,0.06)',
+                    borderRadius: '28px',
+                    overflow: 'hidden',
                   }}
-                  className="rounded-3xl overflow-hidden"
                 >
-                  <Link href={`/milestones/${goal.id}`} className="block">
-                    {/* Card body */}
-                    <div className="bg-gradient-to-br from-red-500 via-red-600 to-red-800 p-7 min-h-[220px] flex flex-col justify-between relative">
-                      {/* Background decorative circles */}
-                      <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-12 translate-x-12" />
-                      <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white/5 translate-y-10 -translate-x-8" />
+                  {/* Card body — tap to go to milestones */}
+                  <Link href={`/milestones?goalId=${goal.id}`} className="block">
+                    <div
+                      className="relative flex flex-col justify-between p-8"
+                      style={{
+                        minHeight: '340px',
+                        background: 'linear-gradient(145deg, #ef4444 0%, #dc2626 40%, #991b1b 100%)',
+                      }}
+                    >
+                      {/* Decorative circles */}
+                      <div
+                        className="absolute rounded-full bg-white/8"
+                        style={{ width: 240, height: 240, top: -60, right: -60 }}
+                      />
+                      <div
+                        className="absolute rounded-full bg-white/5"
+                        style={{ width: 160, height: 160, bottom: -40, left: -40 }}
+                      />
 
+                      {/* Top label */}
                       <div className="relative">
-                        <p className="text-red-200 text-xs font-semibold uppercase tracking-widest mb-2">目標</p>
-                        <h2 className="text-white text-2xl font-bold leading-snug">{goal.title}</h2>
+                        <span className="text-red-200 text-xs font-bold uppercase tracking-widest">
+                          目標
+                        </span>
                       </div>
 
+                      {/* Main title */}
+                      <div className="relative flex-1 flex items-center py-4">
+                        <h2 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(24px, 7vw, 36px)' }}>
+                          {goal.title}
+                        </h2>
+                      </div>
+
+                      {/* Progress section */}
                       <div className="relative">
-                        <div className="flex justify-between text-white/80 text-xs mb-2">
-                          <span>マイルストーン進捗</span>
-                          <span className="font-semibold">{achieved}/{total} 達成</span>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-white/70 text-xs font-medium">マイルストーン進捗</span>
+                          <span className="text-white text-sm font-bold">{achieved}/{total} 達成</span>
                         </div>
-                        <div className="bg-white/20 rounded-full h-2.5">
+                        <div className="bg-white/20 rounded-full h-2">
                           <div
-                            className="bg-white h-2.5 rounded-full transition-all duration-700"
+                            className="bg-white h-2 rounded-full transition-all duration-700"
                             style={{ width: `${progress}%` }}
                           />
                         </div>
-                        <p className="text-white/60 text-xs mt-2 text-right">{progress}%</p>
+                        <p className="text-white/50 text-xs mt-1.5 text-right">{progress}%</p>
                       </div>
                     </div>
                   </Link>
 
                   {/* Card footer */}
-                  <div className="bg-white px-5 py-3 flex items-center justify-between">
+                  <div className="bg-white px-6 py-3.5 flex items-center justify-between">
                     <Link
-                      href={`/milestones/${goal.id}`}
-                      className="flex items-center gap-1 text-sm font-semibold text-red-600"
+                      href={`/milestones?goalId=${goal.id}`}
+                      className="flex items-center gap-1.5 text-sm font-bold text-red-600"
                     >
                       マイルストーンを見る
                       <ChevronRight className="w-4 h-4" />
@@ -192,20 +212,20 @@ export default function GoalsClient() {
             )
           })}
 
-          {/* Bottom spacer so last card can reach center */}
-          <div style={{ height: 'calc(50vh - 160px)', flexShrink: 0 }} />
+          {/* Bottom spacer */}
+          <div style={{ height: 'calc(50vh - 200px)', flexShrink: 0 }} />
         </div>
       )}
 
       {/* Dot indicators */}
       {goals.length > 1 && (
-        <div className="flex justify-center gap-1.5 pb-24 pt-2 flex-shrink-0 absolute bottom-0 left-0 right-0 pointer-events-none">
+        <div className="flex justify-center gap-2 pb-24 pt-2 flex-shrink-0">
           {goals.map((_, i) => (
             <div
               key={i}
               className="rounded-full transition-all duration-300"
               style={{
-                width: i === activeIndex ? 20 : 6,
+                width: i === activeIndex ? 22 : 6,
                 height: 6,
                 background: i === activeIndex ? '#dc2626' : '#d1d5db',
               }}
@@ -214,7 +234,7 @@ export default function GoalsClient() {
         </div>
       )}
 
-      {/* Premium upsell modal */}
+      {/* Premium modal */}
       {premiumModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8"

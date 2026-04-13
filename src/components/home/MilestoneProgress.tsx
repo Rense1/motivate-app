@@ -2,6 +2,7 @@
 
 import { Milestone } from '@/lib/types'
 import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 
 interface MilestoneProgressProps {
   milestones: Milestone[]
@@ -11,46 +12,50 @@ interface MilestoneProgressProps {
 export default function MilestoneProgress({ milestones, goalId }: MilestoneProgressProps) {
   const total = milestones.length
   const achieved = milestones.filter(m => m.is_achieved).length
-  const progress = total > 0 ? achieved / total : 0
-
-  // Find current active milestone
+  const progress = total > 0 ? Math.round((achieved / total) * 100) : 0
   const current = milestones.find(m => !m.is_achieved) || milestones[milestones.length - 1]
 
   return (
-    <Link href={`/milestones/${goalId}`} className="block">
-      <div className="bg-red-600 rounded-2xl p-4 h-full relative overflow-hidden flex flex-col items-center">
-        {/* Dots above */}
-        <div className="flex flex-col items-center gap-1.5 mb-2">
-          {milestones.slice(0, 3).map((m, i) => (
-            <div
-              key={m.id}
-              className={`w-3 h-3 rounded-full ${m.is_achieved ? 'bg-green-400' : 'bg-red-400'}`}
-            />
-          ))}
-        </div>
-
-        {/* Current milestone circle */}
-        {current && (
-          <div className="w-20 h-20 rounded-full bg-red-700 flex items-center justify-center text-center px-2 my-1">
-            <span className="text-white text-xs font-bold leading-tight">{current.title}</span>
-          </div>
-        )}
-
-        {/* Dots below */}
-        <div className="flex flex-col items-center gap-1.5 mt-2 flex-1">
-          {milestones.slice(3, 6).map((m) => (
-            <div
-              key={m.id}
-              className={`w-3 h-3 rounded-full ${m.is_achieved ? 'bg-green-400' : 'bg-red-400'}`}
-            />
-          ))}
-        </div>
-
-        {/* Progress fill at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-8 bg-green-500 rounded-b-2xl flex items-center justify-center"
-          style={{ height: `${Math.max(8, progress * 100)}%`, minHeight: '12px' }}>
-        </div>
+    <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-bold text-gray-800">マイルストーン</h2>
+        <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+          {achieved}/{total}
+        </span>
       </div>
-    </Link>
+
+      {total === 0 ? (
+        <p className="text-gray-400 text-xs">マイルストーンがありません</p>
+      ) : (
+        <div className="space-y-3">
+          {/* Current milestone */}
+          {current && (
+            <div className="bg-gray-50 rounded-2xl px-3 py-2.5">
+              <p className="text-xs text-gray-400 mb-0.5">次のマイルストーン</p>
+              <p className="text-sm font-semibold text-gray-800 leading-snug">{current.title}</p>
+            </div>
+          )}
+
+          {/* Progress bar */}
+          <div>
+            <div className="bg-gray-100 rounded-full h-1.5">
+              <div
+                className="bg-red-500 h-1.5 rounded-full transition-all duration-700"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-right text-xs text-gray-400 mt-1">{progress}%</p>
+          </div>
+        </div>
+      )}
+
+      <Link
+        href={`/milestones?goalId=${goalId}`}
+        className="flex items-center justify-end gap-0.5 mt-3 text-xs font-semibold text-red-600"
+      >
+        詳細を見る
+        <ChevronRight className="w-3.5 h-3.5" />
+      </Link>
+    </div>
   )
 }

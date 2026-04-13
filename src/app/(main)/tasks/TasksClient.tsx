@@ -7,12 +7,12 @@ import TaskCard from '@/components/task/TaskCard'
 import { ChevronLeft, Plus, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import Modal from '@/components/ui/Modal'
-import { useParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 export default function TasksClient() {
-  const params = useParams()
-  const goalId = params.id as string
-  const milestoneId = params.milestoneId as string
+  const searchParams = useSearchParams()
+  const goalId = searchParams.get('goalId')
+  const milestoneId = searchParams.get('milestoneId')
   const router = useRouter()
   const supabase = createClient()
 
@@ -29,12 +29,18 @@ export default function TasksClient() {
   const [savingDeadline, setSavingDeadline] = useState(false)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
 
+  // 🔥 searchParams が安定するまで何も描画しない（初期 null → 誤リダイレクト防止）
+  if (!goalId || !milestoneId) return null
+
   useEffect(() => {
-    if (!milestoneId) return
     async function fetchData() {
       const { data: ms } = await supabase
         .from('milestones').select('*').eq('id', milestoneId).single()
-      if (!ms) { router.replace(`/milestones/${goalId}`); return }
+
+      if (!ms) {
+        router.replace(`/milestones?goalId=${goalId}`)
+        return
+      }
 
       const { data: tasks } = await supabase
         .from('tasks').select('*').eq('milestone_id', milestoneId).order('order_index')
@@ -44,8 +50,9 @@ export default function TasksClient() {
       setTasks(tasks || [])
       setLoading(false)
     }
+
     fetchData()
-  }, [milestoneId])
+  }, [milestoneId, goalId]) // ← goalId を追加（重要）
 
   async function addTask() {
     if (!newTitle.trim()) return
@@ -84,64 +91,87 @@ export default function TasksClient() {
   if (loading || !milestone) return null
 
   return (
-    <div className="page-enter min-h-screen bg-gray-100">
+    <div className="page-enter min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-gray-200">
+      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <Link href={`/milestones/${goalId}`} className="p-1.5 rounded-xl hover:bg-gray-100">
+          <Link href={`/milestones?goalId=${goalId}`} className="p-1.5 rounded-xl hover:bg-gray-100">
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </Link>
-          <p className="text-sm text-gray-500">タスク管理</p>
+          <p className="text-sm font-semibold text-gray-500">タスク管理</p>
         </div>
         <button onClick={() => setDeadlineOpen(true)} className="p-2 rounded-xl hover:bg-gray-100">
           <Calendar className="w-5 h-5 text-red-600" />
         </button>
       </div>
 
-      <div className="p-4 space-y-4">
-        <div className="flex flex-col items-center py-4">
-          <div className="w-28 h-28 rounded-full bg-red-600 flex items-center justify-center shadow-lg">
-            <span className="text-white text-sm font-bold text-center px-3 leading-tight">{milestone.title}</span>
-          </div>
-          {milestone.deadline && (
-            <p className="text-gray-500 text-sm mt-2">
-              期限: {new Date(milestone.deadline).toLocaleDateString('ja-JP')}
+      <div className="px-5 py-6">
+        {/* ── Milestone card ── */}
+        <div
+          style={{
+            borderRadius: 28,
+            background: 'linear-gradient(145deg, #ef4444 0%, #dc2626 40%, #991b1b 100%)',
+            boxShadow: '0 16px 48px rgba(185,28,28,0.25), 0 4px 16px rgba(0,0,0,0.10)',
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          <div
+            className="absolute rounded-full bg-white/8"
+            style={{ width: 200, height: 200, top: -50, right: -50 }}
+          />
+          <div
+            className="absolute rounded-full bg-white/5"
+            style={{ width: 130, height: 130, bottom: -30, left: -30 }}
+          />
+          <div className="relative px-7 py-6">
+            <p className="text-red-200 text-xs font-bold uppercase tracking-widest mb-2">
+              マイルストーン
             </p>
-          )}
-        </div>
-
-        {tasks.length > 0 && (
-          <div className="flex justify-center">
-            <div className="w-0.5 h-6 bg-red-300" />
+            <h2
+              className="text-white font-bold leading-tight mb-3"
+              style={{ fontSize: 'clamp(20px, 6vw, 28px)' }}
+            >
+              {milestone.title}
+            </h2>
+            {milestone.deadline && (
+              <p className="text-white/60 text-xs">
+                期限: {new Date(milestone.deadline).toLocaleDateString('ja-JP')}
+              </p>
+            )}
           </div>
-        )}
-
-        <div className="space-y-3">
-          {tasks.map((task, index) => (
-            <div key={task.id} className="flex flex-col items-center">
-              <TaskCard task={task} onDelete={handleDelete} />
-              {index < tasks.length - 1 && (
-                <div className="flex flex-col items-center py-1">
-                  <span className="text-red-500 text-lg font-bold">+</span>
-                </div>
-              )}
-            </div>
-          ))}
         </div>
 
-        <div className="flex flex-col items-center gap-2 pt-2">
-          {tasks.length > 0 && <div className="w-0.5 h-4 bg-red-300" />}
-          <button
-            onClick={() => setAddOpen(true)}
-            className="w-12 h-12 rounded-full border-2 border-red-500 text-red-500 flex items-center justify-center hover:bg-red-50"
-          >
-            <Plus className="w-6 h-6" />
-          </button>
-          <p className="text-xs text-gray-400">タスクを追加</p>
+        {/* ── Connector + Tasks ── */}
+        <div className="flex flex-col items-center mt-1">
+          <div className="w-0.5 h-8 bg-red-200" />
+
+          <div className="w-full">
+            {tasks.map((task, index) => (
+              <div key={task.id} className="flex flex-col items-center">
+                <TaskCard task={task} onDelete={handleDelete} />
+                {index < tasks.length - 1 && (
+                  <div className="w-0.5 h-6 bg-red-200" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add button */}
+          <div className="flex flex-col items-center gap-1 mt-0">
+            {tasks.length > 0 && <div className="w-0.5 h-6 bg-red-200" />}
+            <button
+              onClick={() => setAddOpen(true)}
+              className="w-12 h-12 rounded-full border-2 border-red-500 text-red-500 flex items-center justify-center hover:bg-red-50 transition-colors"
+            >
+              <Plus className="w-6 h-6" />
+            </button>
+            <p className="text-xs text-gray-400 mt-1">タスクを追加</p>
+          </div>
         </div>
 
         {tasks.length === 0 && (
-          <p className="text-center text-gray-400 text-sm py-4">
+          <p className="text-center text-gray-400 text-sm py-2">
             長押しで「なぜやるのか」を記録できます
           </p>
         )}

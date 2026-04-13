@@ -24,31 +24,41 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
     onTaskToggle(task.id, newCompleted)
   }
 
+  const completed = tasks.filter(t => t.is_completed_today).length
+
   return (
-    <div className="bg-red-600 rounded-2xl p-4 h-full">
-      <h2 className="text-white font-bold text-sm mb-3">タスク</h2>
-      <div className="space-y-2">
-        {tasks.length === 0 ? (
-          <p className="text-red-200 text-xs">タスクがありません</p>
-        ) : (
-          tasks.map(task => (
+    <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-bold text-gray-800">今日のタスク</h2>
+        {tasks.length > 0 && (
+          <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+            {completed}/{tasks.length}
+          </span>
+        )}
+      </div>
+
+      {tasks.length === 0 ? (
+        <p className="text-gray-400 text-xs">タスクがありません</p>
+      ) : (
+        <div className="space-y-3">
+          {tasks.map(task => (
             <button
               key={task.id}
               onClick={() => toggleTask(task)}
-              className="flex items-start gap-2 w-full text-left"
+              className="flex items-start gap-2.5 w-full text-left"
             >
               {task.is_completed_today ? (
-                <CheckCircle2 className="w-4 h-4 text-white mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
               ) : (
-                <Circle className="w-4 h-4 text-red-300 mt-0.5 flex-shrink-0" />
+                <Circle className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" />
               )}
-              <span className={`text-xs text-white leading-tight ${task.is_completed_today ? 'line-through opacity-60' : ''}`}>
+              <span className={`text-xs text-gray-700 leading-snug ${task.is_completed_today ? 'line-through text-gray-400' : ''}`}>
                 {task.title}
               </span>
             </button>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

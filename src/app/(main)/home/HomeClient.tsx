@@ -14,7 +14,6 @@ export default function HomeClient() {
   const [goal, setGoal] = useState<Goal | null>(null)
   const [todayTasks, setTodayTasks] = useState<(Task & { milestone: Milestone })[]>([])
   const [milestones, setMilestones] = useState<Milestone[]>([])
-  const [isPremium, setIsPremium] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -23,19 +22,17 @@ export default function HomeClient() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const [{ data: goals }, { data: profile }] = await Promise.all([
+      const [{ data: goals }] = await Promise.all([
         supabase
           .from('goals')
           .select('*, milestones(*, tasks(*))')
           .eq('user_id', user.id)
           .order('created_at')
           .limit(1),
-        supabase.from('profiles').select('is_premium').eq('id', user.id).single(),
       ])
 
       const g = goals?.[0] || null
       setGoal(g)
-      setIsPremium(profile?.is_premium ?? false)
 
       if (g) {
         const tasks = g.milestones
@@ -66,22 +63,21 @@ export default function HomeClient() {
     setTodayTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed_today: completed } : t))
   }
 
-  // loading.tsx skeleton is shown by Suspense until this returns non-null
   if (loading) return null
 
   if (!goal) {
     return (
-      <div className="page-enter min-h-screen flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mb-4">
-          <span className="text-white text-3xl font-bold">M</span>
+      <div className="page-enter min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6 text-center">
+        <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mb-5">
+          <span className="text-white text-2xl font-bold">M</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Motivate</h1>
-        <p className="text-gray-500 mb-8">あなたの目標を設定して<br />夢への道を歩み始めましょう</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Motivate</h1>
+        <p className="text-gray-500 text-sm mb-8">目標を設定して<br />夢への道を歩み始めましょう</p>
         <Link
           href="/goals/new"
-          className="bg-red-600 text-white px-8 py-4 rounded-2xl font-bold text-lg flex items-center gap-2 shadow-lg"
+          className="bg-red-600 text-white px-7 py-3.5 rounded-2xl font-bold flex items-center gap-2"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-5 h-5" />
           最初の目標を作る
         </Link>
       </div>
@@ -89,25 +85,35 @@ export default function HomeClient() {
   }
 
   return (
-    <div className="page-enter p-4 space-y-4">
-      <div className="flex items-center justify-between pt-2">
-        <h1 className="text-xl font-bold text-gray-800">{goal.title}</h1>
-        <Link href="/goals" className="text-red-600 text-sm font-medium">目標一覧</Link>
+    <div className="page-enter min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <h1 className="text-xl font-bold text-gray-900 leading-tight truncate max-w-[70%]">
+          {goal.title}
+        </h1>
+        <Link href="/goals" className="text-sm font-semibold text-red-600 flex-shrink-0">
+          目標一覧
+        </Link>
       </div>
 
-      <VisionBoard goal={goal} onUpdate={handleGoalUpdate} />
+      <div className="px-5 space-y-4 pb-8">
+        {/* Vision board */}
+        <VisionBoard goal={goal} onUpdate={handleGoalUpdate} />
 
-      <div className="grid grid-cols-2 gap-3" style={{ height: '280px' }}>
+        {/* Today tasks */}
         <TodayTaskList tasks={todayTasks} onTaskToggle={handleTaskToggle} />
-        <MilestoneProgress milestones={milestones} goalId={goal.id} />
-      </div>
 
-      <Link
-        href={`/milestones/${goal.id}`}
-        className="block bg-red-600 text-white text-center py-4 rounded-2xl font-semibold"
-      >
-        マイルストーンを管理する →
-      </Link>
+        {/* Milestone progress */}
+        <MilestoneProgress milestones={milestones} goalId={goal.id} />
+
+        {/* CTA */}
+        <Link
+          href={`/milestones?goalId=${goal.id}`}
+          className="block w-full bg-red-600 text-white text-center py-4 rounded-2xl font-bold text-sm"
+        >
+          マイルストーンを管理する →
+        </Link>
+      </div>
     </div>
   )
 }

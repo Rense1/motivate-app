@@ -7,11 +7,11 @@ import MilestoneRoadmap from '@/components/milestone/MilestoneRoadmap'
 import { ChevronLeft, Plus } from 'lucide-react'
 import Link from 'next/link'
 import Modal from '@/components/ui/Modal'
-import { useParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 export default function MilestonesClient() {
-  const params = useParams()
-  const goalId = params.id as string
+  const searchParams = useSearchParams()
+  const goalId = searchParams.get('goalId') || ''
   const router = useRouter()
   const supabase = createClient()
 
@@ -23,7 +23,7 @@ export default function MilestonesClient() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!goalId) return
+    if (!goalId) { router.replace('/goals'); return }
     async function fetchData() {
       const { data: goal } = await supabase
         .from('goals').select('*').eq('id', goalId).single()
@@ -64,10 +64,11 @@ export default function MilestonesClient() {
   const achieved = milestones.filter(m => m.is_achieved).length
 
   return (
-    <div className="page-enter relative">
-      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-gray-200">
+    <div className="page-enter flex flex-col h-screen bg-gray-50">
+      {/* Header */}
+      <div className="flex-shrink-0 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <Link href="/" className="p-1.5 rounded-xl hover:bg-gray-100">
+          <Link href="/goals" className="p-1.5 rounded-xl hover:bg-gray-100">
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </Link>
           <div>
@@ -84,9 +85,11 @@ export default function MilestonesClient() {
         </button>
       </div>
 
+      {/* Milestone cards — flex-1 so roadmap fills remaining height */}
       <MilestoneRoadmap
         milestones={milestones}
         goalId={goalId}
+        visionImageUrl={goal.vision_image_url}
         onMilestoneUpdate={handleMilestoneUpdate}
       />
 
