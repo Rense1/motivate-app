@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Goal, Milestone, Task } from '@/lib/types'
+import { Goal, Milestone, Task, Profile } from '@/lib/types'
 import VisionBoard from '@/components/home/VisionBoard'
 import TodayTaskList from '@/components/home/TodayTaskList'
 import MilestoneProgress from '@/components/home/MilestoneProgress'
@@ -12,9 +12,10 @@ interface HomeClientProps {
   goal: Goal | null
   todayTasks: (Task & { milestone: Milestone })[]
   milestones: Milestone[]
+  isPremium: boolean
 }
 
-export default function HomeClient({ goal: initialGoal, todayTasks: initialTasks, milestones: initialMilestones }: HomeClientProps) {
+export default function HomeClient({ goal: initialGoal, todayTasks: initialTasks, milestones: initialMilestones, isPremium }: HomeClientProps) {
   const [goal, setGoal] = useState(initialGoal)
   const [todayTasks, setTodayTasks] = useState(initialTasks)
   const [milestones, setMilestones] = useState(initialMilestones)
@@ -29,7 +30,7 @@ export default function HomeClient({ goal: initialGoal, todayTasks: initialTasks
 
   if (!goal) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+      <div className="page-enter min-h-screen flex flex-col items-center justify-center px-6 text-center">
         <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mb-4">
           <span className="text-white text-3xl font-bold">M</span>
         </div>
@@ -47,7 +48,7 @@ export default function HomeClient({ goal: initialGoal, todayTasks: initialTasks
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="page-enter p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-xl font-bold text-gray-800">{goal.title}</h1>
@@ -56,7 +57,7 @@ export default function HomeClient({ goal: initialGoal, todayTasks: initialTasks
       </div>
 
       {/* Vision Board */}
-      <VisionBoard goal={goal} onUpdate={handleGoalUpdate} />
+      <VisionBoard goal={goal} onUpdate={handleGoalUpdate} isPremium={isPremium} />
 
       {/* Tasks + Milestone Progress */}
       <div className="grid grid-cols-2 gap-3" style={{ height: '280px' }}>

@@ -1,3 +1,10 @@
+export interface Profile {
+  id: string
+  is_premium: boolean
+  premium_started_at: string | null
+  created_at: string
+}
+
 export interface Goal {
   id: string
   user_id: string
