@@ -45,17 +45,17 @@ export default function NewGoalPage() {
       return
     }
 
-    // Create milestones
-    const validMilestones = milestones
-      .map((m, i) => ({ goal_id: goal.id, title: m.trim(), order_index: i }))
-      .filter(m => m.title)
-
-    if (validMilestones.length > 0) {
-      await supabase.from('milestones').insert(validMilestones)
+    // Create milestones one by one (sequential) to avoid order_index conflicts
+    const validTitles = milestones.map(m => m.trim()).filter(Boolean)
+    for (let i = 0; i < validTitles.length; i++) {
+      await supabase.from('milestones').insert({
+        goal_id: goal.id,
+        title: validTitles[i],
+        order_index: i,
+      })
     }
 
-    router.push(`/milestones/${goal.id}`)
-    router.refresh()
+    router.push(`/milestones?goalId=${goal.id}`)
   }
 
   return (

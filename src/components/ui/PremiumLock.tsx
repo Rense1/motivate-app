@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Crown, X } from 'lucide-react'
+import { Gem, X } from 'lucide-react'
 
 interface PremiumLockProps {
   children: React.ReactNode
@@ -36,7 +36,7 @@ export default function PremiumLock({ children, isPremium, featureName = 'この
           aria-label={`${featureName}はプレミアム限定です`}
         >
           <div className="bg-yellow-400 rounded-full p-2 shadow-md">
-            <Crown className="w-5 h-5 text-white" />
+            <Gem className="w-5 h-5 text-white" />
           </div>
           <span className="text-xs font-bold text-gray-700 bg-white/80 px-2 py-0.5 rounded-full shadow-sm">
             プレミアム限定
@@ -57,7 +57,7 @@ export default function PremiumLock({ children, isPremium, featureName = 'この
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="bg-yellow-400 rounded-full p-1.5">
-                  <Crown className="w-4 h-4 text-white" />
+                  <Gem className="w-4 h-4 text-white" />
                 </div>
                 <h2 className="text-base font-bold text-gray-800">プレミアムプラン</h2>
               </div>

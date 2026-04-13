@@ -4,33 +4,27 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Goal, Milestone } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Plus, Trash2, ChevronRight, Crown, X } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { Plus, Trash2, ChevronRight, Crown } from 'lucide-react'
+import { useCrownCount } from '@/lib/useCrownCount'
 
 type GoalWithMilestones = Goal & { milestones: Milestone[] }
 
 export default function GoalsClient() {
   const [goals, setGoals] = useState<GoalWithMilestones[]>([])
-  const [isPremium, setIsPremium] = useState(false)
-  const [premiumModalOpen, setPremiumModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
-  const router = useRouter()
   const supabase = createClient()
+  const crownCount = useCrownCount()
 
   useEffect(() => {
     async function fetchData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
-      const [{ data: goals }, { data: profile }] = await Promise.all([
-        supabase.from('goals').select('*, milestones(*)').eq('user_id', user.id).order('created_at'),
-        supabase.from('profiles').select('is_premium').eq('id', user.id).single(),
-      ])
+      const { data: goals } = await supabase
+        .from('goals').select('*, milestones(*)').eq('user_id', user.id).order('created_at')
       setGoals(goals || [])
-      setIsPremium(profile?.is_premium ?? false)
       setLoading(false)
     }
     fetchData()
@@ -46,10 +40,7 @@ export default function GoalsClient() {
       if (!card) return
       const cardCenter = card.offsetTop + card.offsetHeight / 2
       const dist = Math.abs(cardCenter - containerCenter)
-      if (dist < closestDistance) {
-        closestDistance = dist
-        closestIndex = index
-      }
+      if (dist < closestDistance) { closestDistance = dist; closestIndex = index }
     })
     setActiveIndex(closestIndex)
   }, [])
@@ -68,32 +59,28 @@ export default function GoalsClient() {
     setGoals(prev => prev.filter(g => g.id !== id))
   }
 
-  const canAddGoal = isPremium || goals.length === 0
-
   if (loading) return null
 
   return (
     <div className="page-enter flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900">目標一覧</h1>
-        {canAddGoal ? (
-          <Link
-            href="/goals/new"
-            className="bg-red-600 text-white rounded-2xl px-4 py-2 flex items-center gap-1.5 text-sm font-bold shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            追加
-          </Link>
-        ) : (
-          <button
-            onClick={() => setPremiumModalOpen(true)}
-            className="bg-yellow-400 text-white rounded-2xl px-4 py-2 flex items-center gap-1.5 text-sm font-bold shadow-sm"
-          >
-            <Crown className="w-4 h-4" />
-            追加
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {crownCount !== null && crownCount > 0 && (
+            <div className="flex items-center gap-1 bg-yellow-50 border border-yellow-200 rounded-full px-2 py-1">
+              <Crown className="w-3.5 h-3.5 text-yellow-500" />
+              <span className="text-xs font-black text-yellow-600">{crownCount}</span>
+            </div>
+          )}
+          <h1 className="text-2xl font-bold text-gray-900">目標一覧</h1>
+        </div>
+        <Link
+          href="/goals/new"
+          className="bg-red-600 text-white rounded-2xl px-4 py-2 flex items-center gap-1.5 text-sm font-bold shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          追加
+        </Link>
       </div>
 
       {goals.length === 0 ? (
@@ -113,7 +100,6 @@ export default function GoalsClient() {
           className="flex-1 overflow-y-scroll"
           style={{ scrollSnapType: 'y mandatory', scrollbarWidth: 'none' }}
         >
-          {/* Top spacer: first card can scroll to center */}
           <div style={{ height: 'calc(50vh - 200px)', flexShrink: 0 }} />
 
           {goals.map((goal, index) => {
@@ -131,7 +117,7 @@ export default function GoalsClient() {
               >
                 <div
                   style={{
-                    transform: isActive ? 'scale(1.0) translateY(0px)' : 'scale(0.88) translateY(0px)',
+                    transform: isActive ? 'scale(1.0)' : 'scale(0.88)',
                     opacity: isActive ? 1 : 0.55,
                     transition: 'transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease, box-shadow 0.4s ease',
                     boxShadow: isActive
@@ -141,7 +127,7 @@ export default function GoalsClient() {
                     overflow: 'hidden',
                   }}
                 >
-                  {/* Card body — tap to go to milestones */}
+                  {/* Card body */}
                   <Link href={`/milestones?goalId=${goal.id}`} className="block">
                     <div
                       className="relative flex flex-col justify-between p-8"
@@ -150,48 +136,33 @@ export default function GoalsClient() {
                         background: 'linear-gradient(145deg, #ef4444 0%, #dc2626 40%, #991b1b 100%)',
                       }}
                     >
-                      {/* Decorative circles */}
-                      <div
-                        className="absolute rounded-full bg-white/8"
-                        style={{ width: 240, height: 240, top: -60, right: -60 }}
-                      />
-                      <div
-                        className="absolute rounded-full bg-white/5"
-                        style={{ width: 160, height: 160, bottom: -40, left: -40 }}
-                      />
+                      <div className="absolute rounded-full bg-white/8" style={{ width: 240, height: 240, top: -60, right: -60 }} />
+                      <div className="absolute rounded-full bg-white/5" style={{ width: 160, height: 160, bottom: -40, left: -40 }} />
 
-                      {/* Top label */}
                       <div className="relative">
-                        <span className="text-red-200 text-xs font-bold uppercase tracking-widest">
-                          目標
-                        </span>
+                        <span className="text-red-200 text-xs font-bold uppercase tracking-widest">目標</span>
                       </div>
 
-                      {/* Main title */}
                       <div className="relative flex-1 flex items-center py-4">
                         <h2 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(24px, 7vw, 36px)' }}>
                           {goal.title}
                         </h2>
                       </div>
 
-                      {/* Progress section */}
                       <div className="relative">
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-white/70 text-xs font-medium">マイルストーン進捗</span>
                           <span className="text-white text-sm font-bold">{achieved}/{total} 達成</span>
                         </div>
                         <div className="bg-white/20 rounded-full h-2">
-                          <div
-                            className="bg-white h-2 rounded-full transition-all duration-700"
-                            style={{ width: `${progress}%` }}
-                          />
+                          <div className="bg-white h-2 rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
                         </div>
                         <p className="text-white/50 text-xs mt-1.5 text-right">{progress}%</p>
                       </div>
                     </div>
                   </Link>
 
-                  {/* Card footer */}
+                  {/* Footer */}
                   <div className="bg-white px-6 py-3.5 flex items-center justify-between">
                     <Link
                       href={`/milestones?goalId=${goal.id}`}
@@ -212,63 +183,19 @@ export default function GoalsClient() {
             )
           })}
 
-          {/* Bottom spacer */}
           <div style={{ height: 'calc(50vh - 200px)', flexShrink: 0 }} />
         </div>
       )}
 
-      {/* Dot indicators */}
       {goals.length > 1 && (
         <div className="flex justify-center gap-2 pb-24 pt-2 flex-shrink-0">
           {goals.map((_, i) => (
             <div
               key={i}
               className="rounded-full transition-all duration-300"
-              style={{
-                width: i === activeIndex ? 22 : 6,
-                height: 6,
-                background: i === activeIndex ? '#dc2626' : '#d1d5db',
-              }}
+              style={{ width: i === activeIndex ? 22 : 6, height: 6, background: i === activeIndex ? '#dc2626' : '#d1d5db' }}
             />
           ))}
-        </div>
-      )}
-
-      {/* Premium modal */}
-      {premiumModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8"
-          onClick={() => setPremiumModalOpen(false)}
-        >
-          <div
-            className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-yellow-400 rounded-full p-1.5">
-                  <Crown className="w-4 h-4 text-white" />
-                </div>
-                <h2 className="text-base font-bold text-gray-800">プレミアムプラン</h2>
-              </div>
-              <button onClick={() => setPremiumModalOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-            <p className="text-gray-600 text-sm mb-6">
-              フリープランでは<span className="font-semibold text-gray-800">目標は1件まで</span>です。プレミアムプランにアップグレードすると、複数の目標を同時に管理でき、スマホのホーム画面に目標を表示するウィジェット機能も使えます。
-            </p>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center mb-4">
-              <p className="text-yellow-700 font-bold text-sm">🚀 近日公開予定</p>
-              <p className="text-yellow-600 text-xs mt-1">サブスクリプション機能を準備中です</p>
-            </div>
-            <button
-              onClick={() => setPremiumModalOpen(false)}
-              className="w-full bg-gray-100 text-gray-600 py-3 rounded-2xl font-semibold text-sm"
-            >
-              閉じる
-            </button>
-          </div>
         </div>
       )}
     </div>

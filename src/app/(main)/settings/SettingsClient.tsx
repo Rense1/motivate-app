@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types'
-import { Camera, Check, Crown, LogOut, X } from 'lucide-react'
+import { Camera, Check, Gem, LogOut, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function SettingsClient() {
@@ -180,7 +180,7 @@ export default function SettingsClient() {
           >
             <div className="flex items-center gap-3">
               <div className="bg-yellow-400 rounded-full p-2">
-                <Crown className="w-4 h-4 text-white" />
+                <Gem className="w-4 h-4 text-white" />
               </div>
               <div className="text-left">
                 <p className="text-sm font-semibold text-gray-800">プレミアムプラン</p>
@@ -222,7 +222,7 @@ export default function SettingsClient() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="bg-yellow-400 rounded-full p-1.5">
-                  <Crown className="w-4 h-4 text-white" />
+                  <Gem className="w-4 h-4 text-white" />
                 </div>
                 <h2 className="text-base font-bold text-gray-800">プレミアムプラン</h2>
               </div>

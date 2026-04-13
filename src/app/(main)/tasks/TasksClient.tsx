@@ -29,7 +29,11 @@ export default function TasksClient() {
   const [savingDeadline, setSavingDeadline] = useState(false)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
 
-  // 🔥 searchParams が安定するまで何も描画しない（初期 null → 誤リダイレクト防止）
+  // "やる理由" — stores the first reason text and its DB id (null if not yet created)
+  const [reasonText, setReasonText] = useState('')
+  const [reasonId, setReasonId] = useState<string | null>(null)
+  const [savingReason, setSavingReason] = useState(false)
+
   if (!goalId || !milestoneId) return null
 
   useEffect(() => {
@@ -42,17 +46,44 @@ export default function TasksClient() {
         return
       }
 
-      const { data: tasks } = await supabase
-        .from('tasks').select('*').eq('milestone_id', milestoneId).order('order_index')
+      const [{ data: tasks }, { data: reasons }] = await Promise.all([
+        supabase.from('tasks').select('*').eq('milestone_id', milestoneId).order('order_index'),
+        supabase.from('milestone_reasons').select('*').eq('milestone_id', milestoneId).order('order_index').limit(1),
+      ])
 
       setMilestone(ms)
       setDeadline(ms.deadline || '')
       setTasks(tasks || [])
+
+      if (reasons && reasons.length > 0) {
+        setReasonText(reasons[0].reason)
+        setReasonId(reasons[0].id)
+      }
+
       setLoading(false)
     }
 
     fetchData()
-  }, [milestoneId, goalId]) // ← goalId を追加（重要）
+  }, [milestoneId, goalId])
+
+  async function saveReason() {
+    if (!milestoneId) return
+    setSavingReason(true)
+    const trimmed = reasonText.trim()
+
+    if (reasonId) {
+      // Update existing
+      await supabase.from('milestone_reasons').update({ reason: trimmed }).eq('id', reasonId)
+    } else if (trimmed) {
+      // Insert new
+      const { data } = await supabase
+        .from('milestone_reasons')
+        .insert({ milestone_id: milestoneId, reason: trimmed, order_index: 0 })
+        .select().single()
+      if (data) setReasonId(data.id)
+    }
+    setSavingReason(false)
+  }
 
   async function addTask() {
     if (!newTitle.trim()) return
@@ -116,24 +147,37 @@ export default function TasksClient() {
             position: 'relative',
           }}
         >
-          <div
-            className="absolute rounded-full bg-white/8"
-            style={{ width: 200, height: 200, top: -50, right: -50 }}
-          />
-          <div
-            className="absolute rounded-full bg-white/5"
-            style={{ width: 130, height: 130, bottom: -30, left: -30 }}
-          />
+          <div className="absolute rounded-full bg-white/8" style={{ width: 200, height: 200, top: -50, right: -50 }} />
+          <div className="absolute rounded-full bg-white/5" style={{ width: 130, height: 130, bottom: -30, left: -30 }} />
+
           <div className="relative px-7 py-6">
             <p className="text-red-200 text-xs font-bold uppercase tracking-widest mb-2">
               マイルストーン
             </p>
             <h2
-              className="text-white font-bold leading-tight mb-3"
+              className="text-white font-bold leading-tight mb-4"
               style={{ fontSize: 'clamp(20px, 6vw, 28px)' }}
             >
               {milestone.title}
             </h2>
+
+            {/* ── やる理由 inline input ── */}
+            <div className="mb-3">
+              <p className="text-red-200 text-xs font-semibold mb-1.5">やる理由</p>
+              <textarea
+                value={reasonText}
+                onChange={e => setReasonText(e.target.value)}
+                onBlur={saveReason}
+                placeholder="やる理由を入力..."
+                rows={2}
+                className="w-full bg-white/15 text-white placeholder-white/40 text-sm rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-white/40"
+                style={{ fontSize: 13 }}
+              />
+              {savingReason && (
+                <p className="text-white/40 text-xs mt-1">保存中...</p>
+              )}
+            </div>
+
             {milestone.deadline && (
               <p className="text-white/60 text-xs">
                 期限: {new Date(milestone.deadline).toLocaleDateString('ja-JP')}
@@ -169,12 +213,6 @@ export default function TasksClient() {
             <p className="text-xs text-gray-400 mt-1">タスクを追加</p>
           </div>
         </div>
-
-        {tasks.length === 0 && (
-          <p className="text-center text-gray-400 text-sm py-2">
-            長押しで「なぜやるのか」を記録できます
-          </p>
-        )}
       </div>
 
       {/* Add task modal */}

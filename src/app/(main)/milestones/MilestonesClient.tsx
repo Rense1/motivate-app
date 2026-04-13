@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react'
 import { Goal, Milestone } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import MilestoneRoadmap from '@/components/milestone/MilestoneRoadmap'
-import { ChevronLeft, Plus } from 'lucide-react'
+import { ChevronLeft, Plus, Crown } from 'lucide-react'
 import Link from 'next/link'
 import Modal from '@/components/ui/Modal'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useCrownCount } from '@/lib/useCrownCount'
 
 export default function MilestonesClient() {
   const searchParams = useSearchParams()
@@ -21,6 +22,9 @@ export default function MilestonesClient() {
   const [newTitle, setNewTitle] = useState('')
   const [adding, setAdding] = useState(false)
   const [loading, setLoading] = useState(true)
+  // Track which visual index is centered in the roadmap
+  const [activeVisualIndex, setActiveVisualIndex] = useState(0)
+  const crownCount = useCrownCount()
 
   useEffect(() => {
     if (!goalId) { router.replace('/goals'); return }
@@ -46,9 +50,13 @@ export default function MilestonesClient() {
   async function addMilestone() {
     if (!newTitle.trim()) return
     setAdding(true)
+
+    // Always append at the end to avoid order_index conflicts
+    const insertAt = milestones.length
+
     const { data, error } = await supabase
       .from('milestones')
-      .insert({ goal_id: goalId, title: newTitle.trim(), order_index: milestones.length })
+      .insert({ goal_id: goalId, title: newTitle.trim(), order_index: insertAt })
       .select().single()
 
     if (!error && data) {
@@ -71,6 +79,12 @@ export default function MilestonesClient() {
           <Link href="/goals" className="p-1.5 rounded-xl hover:bg-gray-100">
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </Link>
+          {crownCount !== null && crownCount > 0 && (
+            <div className="flex items-center gap-1 bg-yellow-50 border border-yellow-200 rounded-full px-2 py-1">
+              <Crown className="w-3 h-3 text-yellow-500" />
+              <span className="text-xs font-black text-yellow-600">{crownCount}</span>
+            </div>
+          )}
           <div>
             <h1 className="text-base font-bold text-gray-800 leading-tight">{goal.title}</h1>
             <p className="text-xs text-gray-500">{achieved}/{milestones.length} 達成</p>
@@ -85,12 +99,13 @@ export default function MilestonesClient() {
         </button>
       </div>
 
-      {/* Milestone cards — flex-1 so roadmap fills remaining height */}
       <MilestoneRoadmap
         milestones={milestones}
         goalId={goalId}
+        goalTitle={goal.title}
         visionImageUrl={goal.vision_image_url}
         onMilestoneUpdate={handleMilestoneUpdate}
+        onActiveIndexChange={setActiveVisualIndex}
       />
 
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="マイルストーンを追加">
