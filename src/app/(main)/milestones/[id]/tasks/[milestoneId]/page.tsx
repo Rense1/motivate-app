@@ -1,13 +1,8 @@
 import TasksClient from './TasksClient'
 
-// Static export: dynamicParams must be false.
-// A placeholder is generated so the build succeeds; real IDs are resolved
-// client-side via useParams() in TasksClient — no actual navigation to '_'.
-export const dynamicParams = false
-
+// generateStaticParams is required by output: 'export'.
+// Placeholder covers both segments; real IDs are resolved client-side.
 export function generateStaticParams() {
-  // Placeholder covering both segments so the build succeeds.
-  // Real IDs are resolved client-side via useParams() in TasksClient.
   return [{ id: '_', milestoneId: '_' }]
 }
 

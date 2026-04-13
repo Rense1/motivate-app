@@ -1,11 +1,9 @@
 import MilestonesClient from './MilestonesClient'
 
-// Static export requires dynamicParams = false.
-// Actual routing is handled client-side via useParams() in MilestonesClient.
-export const dynamicParams = false
-
+// generateStaticParams is required by output: 'export'.
+// A single placeholder satisfies the build check; real IDs are resolved
+// client-side by useParams() inside MilestonesClient.
 export function generateStaticParams() {
-  // Placeholder so the build succeeds. Real IDs are resolved client-side.
   return [{ id: '_' }]
 }
 
