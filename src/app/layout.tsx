@@ -9,7 +9,7 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "Motivate - 目標管理アプリ",
+  title: "REVIVE - 目標管理アプリ",
   description: "マイルストーンで夢を現実に",
   manifest: "/manifest.json",
 };

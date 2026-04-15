@@ -27,6 +27,8 @@ function deriveTasks(g: GoalWithData): (Task & { milestone: Milestone })[] {
               t.period_done_count,
               t.period_start,
               t.monthly_count,
+              t.interval_value,
+              t.interval_unit,
             )
           )
           .map((t: any) => ({
@@ -108,10 +110,8 @@ export default function HomeClient() {
   if (!goal) {
     return (
       <div className="page-enter min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mb-5">
-          <span className="text-white text-2xl font-bold">M</span>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Motivate</h1>
+        <img src="/logo.svg" alt="REVIVE" className="w-16 h-16 mb-5" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">REVIVE</h1>
         <p className="text-gray-500 text-sm mb-8">目標を設定して<br />夢への道を歩み始めましょう</p>
         <Link
           href="/goals/new"

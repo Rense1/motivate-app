@@ -25,18 +25,20 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
 
     if (newCompleted) {
       // Premium 頻度は期間カウントも更新
-      if (task.frequency === 'weekly_2' || task.frequency === 'monthly_n') {
+      if (task.frequency === 'weekly_2' || task.frequency === 'monthly_n' || task.frequency === 'custom') {
         const periodUpdates = calcPeriodUpdate(
           task.frequency,
           task.period_start,
           task.period_done_count ?? 0,
+          task.interval_value,
+          task.interval_unit,
         )
         updates.period_done_count = periodUpdates.period_done_count
         updates.period_start = periodUpdates.period_start
       }
     } else {
       // 完了を取り消すときは期間カウントを 1 減らす（min 0）
-      if (task.frequency === 'weekly_2' || task.frequency === 'monthly_n') {
+      if (task.frequency === 'weekly_2' || task.frequency === 'monthly_n' || task.frequency === 'custom') {
         updates.period_done_count = Math.max(0, (task.period_done_count ?? 1) - 1)
       }
     }

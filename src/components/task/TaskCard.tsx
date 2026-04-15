@@ -4,15 +4,17 @@ import { useState } from 'react'
 import { Task, TaskReason } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import TaskReasonModal from './TaskReasonModal'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Pencil, Bell } from 'lucide-react'
 import { frequencyLabel } from '@/lib/taskUtils'
 
 interface TaskCardProps {
   task: Task
   onDelete: (id: string) => void
+  onEdit: (task: Task) => void
+  isEditing?: boolean
 }
 
-export default function TaskCard({ task, onDelete }: TaskCardProps) {
+export default function TaskCard({ task, onDelete, onEdit, isEditing = false }: TaskCardProps) {
   const [reasonModalOpen, setReasonModalOpen] = useState(false)
   const [reasons, setReasons] = useState<TaskReason[]>([])
   const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
@@ -46,12 +48,16 @@ export default function TaskCard({ task, onDelete }: TaskCardProps) {
   return (
     <>
       <div
-        className="w-full select-none active:scale-98 transition-transform"
+        className={`w-full select-none transition-all ${isEditing ? 'scale-[0.98] opacity-80' : 'active:scale-98'}`}
         style={{
           borderRadius: 20,
           overflow: 'hidden',
-          background: 'linear-gradient(135deg, #f87171 0%, #dc2626 60%, #b91c1c 100%)',
-          boxShadow: '0 4px 16px rgba(185,28,28,0.18)',
+          background: isEditing
+            ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 60%, #d97706 100%)'
+            : 'linear-gradient(135deg, #f87171 0%, #dc2626 60%, #b91c1c 100%)',
+          boxShadow: isEditing
+            ? '0 4px 16px rgba(217,119,6,0.25)'
+            : '0 4px 16px rgba(185,28,28,0.18)',
         }}
         onMouseDown={startLongPress}
         onMouseUp={cancelLongPress}
@@ -61,17 +67,42 @@ export default function TaskCard({ task, onDelete }: TaskCardProps) {
         onTouchCancel={cancelLongPress}
       >
         <div className="px-5 py-4 flex items-center gap-3">
-          <div className="flex-1">
-            <p className="text-white font-semibold text-base leading-snug">{task.title}</p>
-            <span className="inline-block bg-white/20 text-white/90 text-xs font-medium px-2.5 py-0.5 rounded-full mt-1.5">
-              {frequencyLabel(task.frequency ?? (task.is_daily ? 'daily' : 'none'))}
-            </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-base leading-snug truncate">{task.title}</p>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className="inline-block bg-white/20 text-white/90 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                {frequencyLabel(task.frequency ?? (task.is_daily ? 'daily' : 'none'), task.monthly_count, task.interval_value, task.interval_unit)}
+              </span>
+              {task.notification_enabled && (
+                <span className="inline-flex items-center gap-1 bg-white/20 text-white/80 text-xs px-2 py-0.5 rounded-full">
+                  <Bell className="w-3 h-3" />
+                  {task.notification_time ?? ''}
+                </span>
+              )}
+              {isEditing && (
+                <span className="text-white/70 text-xs">編集中...</span>
+              )}
+            </div>
           </div>
+
+          {/* 編集ボタン */}
+          <button
+            onClick={e => { e.stopPropagation(); onEdit(task) }}
+            onMouseDown={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
+            className="p-1.5 text-white/60 hover:text-white transition-colors"
+            aria-label="編集"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+
+          {/* 削除ボタン */}
           <button
             onClick={e => { e.stopPropagation(); handleDelete() }}
             onMouseDown={e => e.stopPropagation()}
             onTouchStart={e => e.stopPropagation()}
             className="p-1.5 text-white/50 hover:text-white transition-colors"
+            aria-label="削除"
           >
             <Trash2 className="w-4 h-4" />
           </button>

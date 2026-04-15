@@ -1,4 +1,4 @@
-import { Task, TaskFrequency } from './types'
+import { Task, TaskFrequency, IntervalUnit } from './types'
 
 // ── 期間計算ヘルパー ────────────────────────────────────────────────────────
 
@@ -75,33 +75,31 @@ export function shouldShowInToday(
   periodDoneCount?: number | null,
   periodStart?: string | null,
   monthlyCount?: number | null,
+  intervalValue?: number | null,
+  intervalUnit?: IntervalUnit | null,
 ): boolean {
   const now = new Date()
 
   switch (frequency) {
     // ── 毎日 ──────────────────────────────────────────────────────────────
     case 'daily':
-      // 毎日表示（完了チェックは is_completed_today で管理。翌日自動リセット）
       return true
 
     // ── 毎週 1 回 ─────────────────────────────────────────────────────────
     case 'weekly': {
-      // 今週まだ完了していなければ表示
       if (!lastCompletedAt) return true
       const last = new Date(lastCompletedAt)
       const weekStart = getWeekStart(now)
-      return last < weekStart // 今週以前に完了 → 今週はまだ未完了
+      return last < weekStart
     }
 
     // ── 1 回のみ ──────────────────────────────────────────────────────────
     case 'none':
-      // 一度でも完了したら非表示
       return !lastCompletedAt
 
-    // ── Premium: 毎週 2 回 ────────────────────────────────────────────────
+    // ── Premium: 毎週 2 回（後方互換） ────────────────────────────────────
     case 'weekly_2': {
       const weekStart = getWeekStart(now)
-      // period_start が今週より前なら新しい週 → カウントをリセット扱い
       const effectiveDone =
         periodStart && new Date(periodStart) >= weekStart
           ? (periodDoneCount ?? 0)
@@ -109,7 +107,7 @@ export function shouldShowInToday(
       return effectiveDone < 2
     }
 
-    // ── Premium: 3 日に 1 回 ──────────────────────────────────────────────
+    // ── Premium: 3 日に 1 回（後方互換） ──────────────────────────────────
     case 'every_3_days': {
       if (!lastCompletedAt) return true
       const last = new Date(lastCompletedAt)
@@ -117,16 +115,52 @@ export function shouldShowInToday(
       return daysSince >= 3
     }
 
-    // ── Premium: 毎月 n 回 ────────────────────────────────────────────────
+    // ── Premium: 毎月 n 回（後方互換） ────────────────────────────────────
     case 'monthly_n': {
       const target = monthlyCount ?? 1
       const monthStart = getMonthStart(now)
-      // period_start が今月より前なら月初リセット扱い
       const effectiveDone =
         periodStart && new Date(periodStart) >= monthStart
           ? (periodDoneCount ?? 0)
           : 0
       return effectiveDone < target
+    }
+
+    // ── Premium: カスタム（N日/週/月 に M回） ─────────────────────────────
+    case 'custom': {
+      const iv = intervalValue ?? 1
+      const iu = intervalUnit ?? 'week'
+      const times = monthlyCount ?? 1
+
+      if (iu === 'day') {
+        if (times === 1) {
+          // N日に1回: 最終完了からN日以上経過していれば表示
+          if (!lastCompletedAt) return true
+          const daysSince = (now.getTime() - new Date(lastCompletedAt).getTime()) / (1000 * 60 * 60 * 24)
+          return daysSince >= iv
+        }
+        // N日にM回: ローリング期間で管理
+        const periodMs = iv * 24 * 60 * 60 * 1000
+        const periodStartDate = periodStart ? new Date(periodStart) : null
+        const isNewPeriod = !periodStartDate || (now.getTime() - periodStartDate.getTime()) >= periodMs
+        return (isNewPeriod ? 0 : (periodDoneCount ?? 0)) < times
+      }
+
+      if (iu === 'week') {
+        // N週にM回: ローリング期間で管理
+        const periodMs = iv * 7 * 24 * 60 * 60 * 1000
+        const periodStartDate = periodStart ? new Date(periodStart) : null
+        const isNewPeriod = !periodStartDate || (now.getTime() - periodStartDate.getTime()) >= periodMs
+        return (isNewPeriod ? 0 : (periodDoneCount ?? 0)) < times
+      }
+
+      // month: N月にM回
+      const periodStartDate = periodStart ? new Date(periodStart) : null
+      const isNewPeriod = !periodStartDate || (() => {
+        const target = new Date(periodStartDate.getFullYear(), periodStartDate.getMonth() + iv, periodStartDate.getDate())
+        return now >= target
+      })()
+      return (isNewPeriod ? 0 : (periodDoneCount ?? 0)) < times
     }
 
     default:
@@ -139,7 +173,12 @@ export function shouldShowInToday(
 /**
  * Human-readable label for frequency.
  */
-export function frequencyLabel(frequency: TaskFrequency, monthlyCount?: number | null): string {
+export function frequencyLabel(
+  frequency: TaskFrequency,
+  monthlyCount?: number | null,
+  intervalValue?: number | null,
+  intervalUnit?: IntervalUnit | null,
+): string {
   switch (frequency) {
     case 'daily':        return '毎日'
     case 'weekly':       return '毎週'
@@ -147,6 +186,13 @@ export function frequencyLabel(frequency: TaskFrequency, monthlyCount?: number |
     case 'weekly_2':     return '毎週2回'
     case 'every_3_days': return '3日に1回'
     case 'monthly_n':    return `毎月${monthlyCount ?? 1}回`
+    case 'custom': {
+      const iv = intervalValue ?? 1
+      const iu = intervalUnit ?? 'week'
+      const t = monthlyCount ?? 1
+      const unitLabel = iu === 'day' ? '日' : iu === 'week' ? '週' : 'ヶ月'
+      return `${iv}${unitLabel}に${t}回`
+    }
   }
 }
 
@@ -157,30 +203,55 @@ export function frequencyLabel(frequency: TaskFrequency, monthlyCount?: number |
  * period が新しい週/月に入っていたらカウントをリセットする。
  */
 export function calcPeriodUpdate(
-  frequency: 'weekly_2' | 'monthly_n',
+  frequency: 'weekly_2' | 'monthly_n' | 'custom',
   periodStart: string | null,
   periodDoneCount: number,
+  intervalValue?: number | null,
+  intervalUnit?: IntervalUnit | null,
 ): { period_done_count: number; period_start: string } {
   const now = new Date()
+  const today = now.toISOString().split('T')[0]
 
   if (frequency === 'weekly_2') {
     const weekStart = getWeekStart(now)
     const isNewPeriod = !periodStart || new Date(periodStart) < weekStart
     return {
       period_done_count: isNewPeriod ? 1 : periodDoneCount + 1,
-      period_start: isNewPeriod
-        ? weekStart.toISOString().split('T')[0]
-        : periodStart!,
+      period_start: isNewPeriod ? weekStart.toISOString().split('T')[0] : periodStart!,
     }
-  } else {
-    // monthly_n
+  }
+
+  if (frequency === 'monthly_n') {
     const monthStart = getMonthStart(now)
     const isNewPeriod = !periodStart || new Date(periodStart) < monthStart
     return {
       period_done_count: isNewPeriod ? 1 : periodDoneCount + 1,
-      period_start: isNewPeriod
-        ? monthStart.toISOString().split('T')[0]
-        : periodStart!,
+      period_start: isNewPeriod ? monthStart.toISOString().split('T')[0] : periodStart!,
     }
+  }
+
+  // custom
+  const iv = intervalValue ?? 1
+  const iu = intervalUnit ?? 'week'
+  const periodStartDate = periodStart ? new Date(periodStart) : null
+
+  let isNewPeriod: boolean
+  if (!periodStartDate) {
+    isNewPeriod = true
+  } else if (iu === 'day') {
+    const periodMs = iv * 24 * 60 * 60 * 1000
+    isNewPeriod = (now.getTime() - periodStartDate.getTime()) >= periodMs
+  } else if (iu === 'week') {
+    const periodMs = iv * 7 * 24 * 60 * 60 * 1000
+    isNewPeriod = (now.getTime() - periodStartDate.getTime()) >= periodMs
+  } else {
+    // month
+    const target = new Date(periodStartDate.getFullYear(), periodStartDate.getMonth() + iv, periodStartDate.getDate())
+    isNewPeriod = now >= target
+  }
+
+  return {
+    period_done_count: isNewPeriod ? 1 : periodDoneCount + 1,
+    period_start: isNewPeriod ? today : periodStart!,
   }
 }

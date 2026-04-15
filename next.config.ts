@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Static export for Capacitor Android/iOS
-  // output: "export",
+  output: "export",
   trailingSlash: true,
 
   // next/image optimization is not available in static exports

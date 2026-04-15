@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="url(#bg)"/>
+  <!-- Subtle inner glow ring -->
+  <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+  <!-- Bold R (path-based for reliable rendering) -->
+  <!-- Outer shape: stem + bowl + diagonal leg -->
+  <path
+    fill="white"
+    fill-rule="evenodd"
+    d="
+      M 48,37
+      L 118,37
+      A 37,31 0 0,1 118,99
+      L 101,99
+      L 133,163
+      L 107,163
+      L 81,107
+      L 74,107
+      L 74,163
+      L 48,163
+      Z
+      M 74,52
+      L 111,52
+      A 22,20 0 0,1 111,84
+      L 74,84
+      Z
+    "
+  />
+</svg>

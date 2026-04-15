@@ -1,10 +1,11 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 android {
-    namespace = "com.motivateapp.app"
+    namespace = "com.revive.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.motivateapp.app"
+        applicationId "com.revive.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -40,6 +41,11 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+
+    // Jetpack Glance (ホーム画面ウィジェット)
+    implementation "androidx.glance:glance-appwidget:1.1.1"
+    implementation "androidx.glance:glance-material3:1.1.1"
+    implementation "androidx.work:work-runtime-ktx:2.9.1"
 }
 
 apply from: 'capacitor.build.gradle'
