@@ -2,6 +2,41 @@ import { Task, TaskFrequency, IntervalUnit } from './types'
 
 // ── 期間計算ヘルパー ────────────────────────────────────────────────────────
 
+/**
+ * task_start_at を起点にした、現在の期間の開始日を YYYY-MM-DD で返す。
+ * 例: 開始2024-01-01, 2週間ごと → 2週ごとに更新される "今の期間の開始日"
+ */
+function getPeriodStartFromTaskStart(
+  taskStartAt: string,
+  intervalValue: number,
+  intervalUnit: IntervalUnit,
+): string {
+  const startDate = new Date(taskStartAt)
+  const now = new Date()
+  let periodStart: Date
+
+  if (intervalUnit === 'month') {
+    const totalMonthsElapsed =
+      (now.getFullYear() - startDate.getFullYear()) * 12 +
+      (now.getMonth() - startDate.getMonth())
+    const periodsElapsed = Math.max(0, Math.floor(totalMonthsElapsed / intervalValue))
+    periodStart = new Date(
+      startDate.getFullYear(),
+      startDate.getMonth() + periodsElapsed * intervalValue,
+      startDate.getDate(),
+    )
+  } else {
+    const periodMs =
+      intervalUnit === 'week'
+        ? intervalValue * 7 * 24 * 60 * 60 * 1000
+        : intervalValue * 24 * 60 * 60 * 1000
+    const elapsed = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / periodMs))
+    periodStart = new Date(startDate.getTime() + elapsed * periodMs)
+  }
+
+  return periodStart.toISOString().split('T')[0]
+}
+
 /** 指定日を含む週の月曜日（00:00:00）を返す */
 function getWeekStart(date: Date): Date {
   const d = new Date(date)
@@ -77,6 +112,8 @@ export function shouldShowInToday(
   monthlyCount?: number | null,
   intervalValue?: number | null,
   intervalUnit?: IntervalUnit | null,
+  taskStartAt?: string | null,
+  taskEndAt?: string | null,
 ): boolean {
   const now = new Date()
 
@@ -126,41 +163,24 @@ export function shouldShowInToday(
       return effectiveDone < target
     }
 
-    // ── Premium: カスタム（N日/週/月 に M回） ─────────────────────────────
+    // ── Premium: カスタム（N日/週/月 に M回、開始日起点） ─────────────────
     case 'custom': {
+      if (!taskStartAt) return false
+
+      // 開始日前は表示しない
+      if (now < new Date(taskStartAt)) return false
+      // 終了日後は表示しない
+      if (taskEndAt && now > new Date(taskEndAt)) return false
+
       const iv = intervalValue ?? 1
       const iu = intervalUnit ?? 'week'
       const times = monthlyCount ?? 1
 
-      if (iu === 'day') {
-        if (times === 1) {
-          // N日に1回: 最終完了からN日以上経過していれば表示
-          if (!lastCompletedAt) return true
-          const daysSince = (now.getTime() - new Date(lastCompletedAt).getTime()) / (1000 * 60 * 60 * 24)
-          return daysSince >= iv
-        }
-        // N日にM回: ローリング期間で管理
-        const periodMs = iv * 24 * 60 * 60 * 1000
-        const periodStartDate = periodStart ? new Date(periodStart) : null
-        const isNewPeriod = !periodStartDate || (now.getTime() - periodStartDate.getTime()) >= periodMs
-        return (isNewPeriod ? 0 : (periodDoneCount ?? 0)) < times
-      }
-
-      if (iu === 'week') {
-        // N週にM回: ローリング期間で管理
-        const periodMs = iv * 7 * 24 * 60 * 60 * 1000
-        const periodStartDate = periodStart ? new Date(periodStart) : null
-        const isNewPeriod = !periodStartDate || (now.getTime() - periodStartDate.getTime()) >= periodMs
-        return (isNewPeriod ? 0 : (periodDoneCount ?? 0)) < times
-      }
-
-      // month: N月にM回
-      const periodStartDate = periodStart ? new Date(periodStart) : null
-      const isNewPeriod = !periodStartDate || (() => {
-        const target = new Date(periodStartDate.getFullYear(), periodStartDate.getMonth() + iv, periodStartDate.getDate())
-        return now >= target
-      })()
-      return (isNewPeriod ? 0 : (periodDoneCount ?? 0)) < times
+      // 開始日を起点にした現在の期間開始日を計算
+      const currentPeriodStart = getPeriodStartFromTaskStart(taskStartAt, iv, iu)
+      // 保存された period_start が現在の期間と一致するか確認
+      const effectiveDone = periodStart === currentPeriodStart ? (periodDoneCount ?? 0) : 0
+      return effectiveDone < times
     }
 
     default:
@@ -208,6 +228,7 @@ export function calcPeriodUpdate(
   periodDoneCount: number,
   intervalValue?: number | null,
   intervalUnit?: IntervalUnit | null,
+  taskStartAt?: string | null,
 ): { period_done_count: number; period_start: string } {
   const now = new Date()
   const today = now.toISOString().split('T')[0]
@@ -230,26 +251,33 @@ export function calcPeriodUpdate(
     }
   }
 
-  // custom
+  // custom: 開始日を起点にした期間計算
   const iv = intervalValue ?? 1
   const iu = intervalUnit ?? 'week'
-  const periodStartDate = periodStart ? new Date(periodStart) : null
 
+  if (taskStartAt) {
+    // 開始日起点: 現在の期間の開始日を計算
+    const currentPeriodStart = getPeriodStartFromTaskStart(taskStartAt, iv, iu)
+    const isNewPeriod = periodStart !== currentPeriodStart
+    return {
+      period_done_count: isNewPeriod ? 1 : periodDoneCount + 1,
+      period_start: currentPeriodStart,
+    }
+  }
+
+  // task_start_at がない場合のフォールバック（旧データ互換）
+  const periodStartDate = periodStart ? new Date(periodStart) : null
   let isNewPeriod: boolean
   if (!periodStartDate) {
     isNewPeriod = true
   } else if (iu === 'day') {
-    const periodMs = iv * 24 * 60 * 60 * 1000
-    isNewPeriod = (now.getTime() - periodStartDate.getTime()) >= periodMs
+    isNewPeriod = (now.getTime() - periodStartDate.getTime()) >= iv * 24 * 60 * 60 * 1000
   } else if (iu === 'week') {
-    const periodMs = iv * 7 * 24 * 60 * 60 * 1000
-    isNewPeriod = (now.getTime() - periodStartDate.getTime()) >= periodMs
+    isNewPeriod = (now.getTime() - periodStartDate.getTime()) >= iv * 7 * 24 * 60 * 60 * 1000
   } else {
-    // month
     const target = new Date(periodStartDate.getFullYear(), periodStartDate.getMonth() + iv, periodStartDate.getDate())
     isNewPeriod = now >= target
   }
-
   return {
     period_done_count: isNewPeriod ? 1 : periodDoneCount + 1,
     period_start: isNewPeriod ? today : periodStart!,

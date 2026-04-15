@@ -66,8 +66,10 @@ export interface Task {
   interval_value?: number | null
   /** custom 頻度: 間隔の単位 'day' | 'week' | 'month' */
   interval_unit?: IntervalUnit | null
-  /** タスク単体の期日 */
-  deadline?: string | null
+  /** custom 頻度: 開始日時 (ISO8601) */
+  task_start_at?: string | null
+  /** custom 頻度: 終了日時 (ISO8601) */
+  task_end_at?: string | null
   /** 現在の期間（週 or 月）内の完了数 */
   period_done_count: number
   /** period_done_count のカウント開始日 */

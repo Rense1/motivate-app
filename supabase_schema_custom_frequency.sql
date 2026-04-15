@@ -1,5 +1,5 @@
 -- ============================================================
--- カスタム頻度・タスク期日 スキーマ拡張
+-- カスタム頻度・開始日・終了日 スキーマ拡張
 -- Supabase SQL Editor で実行してください
 -- ============================================================
 
@@ -19,13 +19,19 @@ ALTER TABLE tasks
   ADD COLUMN IF NOT EXISTS interval_unit TEXT DEFAULT 'week'
   CHECK (interval_unit IN ('day', 'week', 'month'));
 
--- 4. タスク単体の期日
+-- 4. task_start_at: 頻度の開始日時（必須）
 ALTER TABLE tasks
-  ADD COLUMN IF NOT EXISTS deadline DATE;
+  ADD COLUMN IF NOT EXISTS task_start_at TIMESTAMPTZ;
+
+-- 5. task_end_at: 頻度の終了日時（必須）
+ALTER TABLE tasks
+  ADD COLUMN IF NOT EXISTS task_end_at TIMESTAMPTZ;
 
 -- ============================================================
 -- 補足
 -- monthly_count カラム（既存）を times_per_interval として流用します。
 -- 例: 3日に2回 → frequency='custom', interval_value=3,
---     interval_unit='day', monthly_count=2
+--     interval_unit='day', monthly_count=2,
+--     task_start_at='2024-01-01T09:00:00+09:00',
+--     task_end_at='2024-12-31T23:59:59+09:00'
 -- ============================================================

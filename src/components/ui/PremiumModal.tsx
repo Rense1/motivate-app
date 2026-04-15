@@ -11,8 +11,8 @@ interface PremiumModalProps {
 const FEATURE_LIST = [
   {
     icon: '📅',
-    title: '詳細な頻度・期限設定',
-    desc: '毎週2回・3日に1回・毎月◯回などのカスタム頻度、またはタスクごとの期日設定',
+    title: '詳細な頻度・日付設定',
+    desc: 'N日/週/月にM回などのカスタム頻度と、開始日・終了日をタスクごとに設定',
   },
   {
     icon: '🔔',

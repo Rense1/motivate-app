@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Task, Milestone } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { CheckCircle2, Circle } from 'lucide-react'
@@ -12,11 +13,17 @@ interface TodayTaskListProps {
 
 export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProps) {
   const supabase = createClient()
+  const [animId, setAnimId] = useState<string | null>(null)
 
   async function toggleTask(task: Task) {
     const newCompleted = !task.is_completed_today
 
-    // ── DB 更新フィールドを構築 ──────────────────────────────────────
+    // チェック完了時にアニメーション発火
+    if (newCompleted) {
+      setAnimId(task.id)
+      setTimeout(() => setAnimId(null), 500)
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: Record<string, any> = {
       is_completed_today: newCompleted,
@@ -24,7 +31,6 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
     }
 
     if (newCompleted) {
-      // Premium 頻度は期間カウントも更新
       if (task.frequency === 'weekly_2' || task.frequency === 'monthly_n' || task.frequency === 'custom') {
         const periodUpdates = calcPeriodUpdate(
           task.frequency,
@@ -32,12 +38,12 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
           task.period_done_count ?? 0,
           task.interval_value,
           task.interval_unit,
+          task.task_start_at,
         )
         updates.period_done_count = periodUpdates.period_done_count
         updates.period_start = periodUpdates.period_start
       }
     } else {
-      // 完了を取り消すときは期間カウントを 1 減らす（min 0）
       if (task.frequency === 'weekly_2' || task.frequency === 'monthly_n' || task.frequency === 'custom') {
         updates.period_done_count = Math.max(0, (task.period_done_count ?? 1) - 1)
       }
@@ -68,21 +74,38 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
             <button
               key={task.id}
               onClick={() => toggleTask(task)}
-              className="flex items-start gap-2.5 w-full text-left"
+              className="flex items-start gap-2.5 w-full text-left group"
             >
-              {task.is_completed_today ? (
-                <CheckCircle2 className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-              ) : (
-                <Circle className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" />
-              )}
+              {/* チェックアイコン + アニメーション */}
+              <div className="relative mt-0.5 flex-shrink-0 w-5 h-5">
+                {task.is_completed_today ? (
+                  <CheckCircle2
+                    className={`w-5 h-5 text-red-500 transition-transform duration-200 ${
+                      animId === task.id ? 'scale-[1.45]' : 'scale-100'
+                    }`}
+                  />
+                ) : (
+                  <Circle className="w-5 h-5 text-gray-300 group-active:text-gray-400 transition-colors" />
+                )}
+                {/* 完了時のリップルエフェクト */}
+                {animId === task.id && (
+                  <span
+                    className="absolute inset-[-4px] rounded-full bg-red-400/30 pointer-events-none"
+                    style={{ animation: 'task-complete-ripple 0.5s ease-out forwards' }}
+                  />
+                )}
+              </div>
+
               <div className="flex-1 min-w-0">
-                <span className={`text-xs text-gray-700 leading-snug ${task.is_completed_today ? 'line-through text-gray-400' : ''}`}>
+                <span className={`text-xs text-gray-700 leading-snug transition-colors ${
+                  task.is_completed_today ? 'line-through text-gray-400' : ''
+                }`}>
                   {task.title}
                 </span>
-                {/* premium 頻度はラベルを小さく表示 */}
-                {(task.frequency === 'weekly_2' || task.frequency === 'every_3_days' || task.frequency === 'monthly_n') && (
+                {(task.frequency === 'weekly_2' || task.frequency === 'every_3_days' ||
+                  task.frequency === 'monthly_n' || task.frequency === 'custom') && (
                   <span className="block text-[10px] text-gray-400 mt-0.5">
-                    {frequencyLabel(task.frequency, task.monthly_count)}
+                    {frequencyLabel(task.frequency, task.monthly_count, task.interval_value, task.interval_unit)}
                   </span>
                 )}
               </div>

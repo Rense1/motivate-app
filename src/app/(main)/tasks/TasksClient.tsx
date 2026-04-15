@@ -30,16 +30,24 @@ const BASIC_FREQUENCIES: { value: TaskFrequency; label: string }[] = [
   { value: 'none',   label: '1回' },
 ]
 
+// datetime-local 文字列 (YYYY-MM-DDTHH:mm) に変換
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 // ── フォーム型 ────────────────────────────────────────────────────────────
 interface FormState {
   title: string
   frequency: TaskFrequency          // 基本頻度（毎日/毎週/1回）
-  // ── Premium: 詳細な頻度・期限設定 ────────────────────────────────────
+  // ── Premium: 詳細な頻度・日付設定 ────────────────────────────────────
   showPremiumDetail: boolean
   intervalValue: number             // N（例: 3日に1回 → 3）
   intervalUnit: IntervalUnit        // 日/週/月
   timesPerInterval: number          // M（例: 1週に2回 → 2）
-  taskDeadline: string              // YYYY-MM-DD
+  taskStartAt: string               // YYYY-MM-DDTHH:mm（必須）
+  taskEndAt: string                 // YYYY-MM-DDTHH:mm（必須）
   // ── Premium: 通知設定 ─────────────────────────────────────────────────
   showNotification: boolean
   notificationOn: boolean
@@ -54,7 +62,8 @@ function emptyForm(): FormState {
     intervalValue: 1,
     intervalUnit: 'week',
     timesPerInterval: 1,
-    taskDeadline: '',
+    taskStartAt: '',
+    taskEndAt: '',
     showNotification: false,
     notificationOn: false,
     notifEntries: [],
@@ -161,7 +170,7 @@ export default function TasksClient() {
     } else if (task.frequency === 'monthly_n') {
       intervalValue = 1; intervalUnit = 'month'; timesPerInterval = task.monthly_count ?? 1
     }
-    const showDetail = isPremiumFreq || !!task.deadline
+    const showDetail = isPremiumFreq || !!task.task_start_at
 
     setEditId(task.id)
     setForm({
@@ -171,7 +180,8 @@ export default function TasksClient() {
       intervalValue,
       intervalUnit,
       timesPerInterval,
-      taskDeadline: task.deadline ?? '',
+      taskStartAt: task.task_start_at ? toDatetimeLocal(task.task_start_at) : '',
+      taskEndAt:   task.task_end_at   ? toDatetimeLocal(task.task_end_at)   : '',
       showNotification: task.notification_enabled ?? false,
       notificationOn: task.notification_enabled ?? false,
       notifEntries: task.notification_times
@@ -211,15 +221,17 @@ export default function TasksClient() {
       monthly_count:  form.showPremiumDetail ? form.timesPerInterval : null,
       interval_value: form.showPremiumDetail ? form.intervalValue    : null,
       interval_unit:  form.showPremiumDetail ? form.intervalUnit     : null,
-      deadline:       form.taskDeadline || null,
+      task_start_at:  form.showPremiumDetail && form.taskStartAt ? new Date(form.taskStartAt).toISOString() : null,
+      task_end_at:    form.showPremiumDetail && form.taskEndAt   ? new Date(form.taskEndAt).toISOString()   : null,
     }
     const fullPayload = { ...basePayload, ...premiumPayload }
 
     // スキーマキャッシュエラー判定
     const isPremiumColErr = (msg: string) =>
-      msg.includes('deadline')       || msg.includes('interval_value') ||
-      msg.includes('interval_unit')  || msg.includes('monthly_count')  ||
-      msg.includes('period_done_count') || msg.includes('period_start')
+      msg.includes('task_start_at') || msg.includes('task_end_at')  ||
+      msg.includes('interval_value') || msg.includes('interval_unit') ||
+      msg.includes('monthly_count') || msg.includes('period_done_count') ||
+      msg.includes('period_start')
     const isFreqColErr = (msg: string) => msg.includes('frequency')
 
     let useFrequencyCol = true
@@ -469,32 +481,29 @@ export default function TasksClient() {
                 </div>
               </div>
 
-              {/* ── Premium: 詳細な頻度・期限設定 ──────────────────────────── */}
+              {/* ── Premium: 詳細な頻度・日付設定 ──────────────────────────── */}
               <div>
                 <button type="button"
                   onClick={() => {
-                    if (!isPremium) { setPremiumFeatureName('詳細な頻度・期限設定'); setPremiumModalOpen(true); return }
+                    if (!isPremium) { setPremiumFeatureName('詳細な頻度・日付設定'); setPremiumModalOpen(true); return }
                     setForm(prev => ({ ...prev, showPremiumDetail: !prev.showPremiumDetail }))
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs font-semibold transition ${
-                    (form.showPremiumDetail || form.taskDeadline)
+                    form.showPremiumDetail
                       ? 'bg-yellow-50 border-yellow-300 text-yellow-700'
                       : 'bg-gray-50 border-gray-200 text-gray-500'
                   }`}
                 >
                   <span className="flex items-center gap-1.5">
                     {!isPremium && <Lock className="w-3 h-3" />}
-                    詳細な頻度・期限設定
+                    詳細な頻度・日付設定
                     {!isPremium
                       ? <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">Premium</span>
-                      : form.showPremiumDetail
+                      : form.showPremiumDetail && form.taskStartAt
                         ? <span className="text-yellow-600">
                             — {form.intervalValue}{form.intervalUnit === 'day' ? '日' : form.intervalUnit === 'week' ? '週' : 'ヶ月'}に{form.timesPerInterval}回
-                            {form.taskDeadline ? ` / ${new Date(form.taskDeadline + 'T00:00:00').toLocaleDateString('ja-JP')}` : ''}
                           </span>
-                        : form.taskDeadline
-                          ? <span className="text-yellow-600">— {new Date(form.taskDeadline + 'T00:00:00').toLocaleDateString('ja-JP')}</span>
-                          : null
+                        : null
                     }
                   </span>
                   {isPremium && (form.showPremiumDetail
@@ -558,22 +567,36 @@ export default function TasksClient() {
                       })()}
                     </div>
 
-                    {/* 期日設定 */}
+                    {/* 開始日（必須） */}
                     <div>
-                      <p className="text-xs font-semibold text-yellow-700 mb-2">期日（任意）</p>
-                      <div className="flex items-center gap-2">
-                        <input type="date"
-                          value={form.taskDeadline}
-                          onChange={e => setForm(prev => ({ ...prev, taskDeadline: e.target.value }))}
-                          className="flex-1 border border-yellow-300 rounded-xl px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                        />
-                        {form.taskDeadline && (
-                          <button type="button"
-                            onClick={() => setForm(prev => ({ ...prev, taskDeadline: '' }))}
-                            className="text-xs text-yellow-600 hover:text-red-500 whitespace-nowrap"
-                          >クリア</button>
-                        )}
-                      </div>
+                      <p className="text-xs font-semibold text-yellow-700 mb-1.5">
+                        開始日時 <span className="text-red-500">*</span>
+                      </p>
+                      <input type="datetime-local"
+                        value={form.taskStartAt}
+                        onChange={e => setForm(prev => ({ ...prev, taskStartAt: e.target.value }))}
+                        className={`w-full border rounded-xl px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 ${
+                          !form.taskStartAt ? 'border-red-300' : 'border-yellow-300'
+                        }`}
+                      />
+                    </div>
+
+                    {/* 終了日（必須） */}
+                    <div>
+                      <p className="text-xs font-semibold text-yellow-700 mb-1.5">
+                        終了日時 <span className="text-red-500">*</span>
+                      </p>
+                      <input type="datetime-local"
+                        value={form.taskEndAt}
+                        min={form.taskStartAt}
+                        onChange={e => setForm(prev => ({ ...prev, taskEndAt: e.target.value }))}
+                        className={`w-full border rounded-xl px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 ${
+                          !form.taskEndAt ? 'border-red-300' : 'border-yellow-300'
+                        }`}
+                      />
+                      {form.showPremiumDetail && (!form.taskStartAt || !form.taskEndAt) && (
+                        <p className="text-[10px] text-red-500 mt-1">開始日時と終了日時は必須です</p>
+                      )}
                     </div>
 
                   </div>
@@ -624,9 +647,9 @@ export default function TasksClient() {
                             ? [{ id: newNotifId(), type: 'weekly', day: 1, time: '08:00' }]
                             : prev.notifEntries,
                         }))}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${form.notificationOn ? 'bg-blue-500' : 'bg-gray-300'}`}
+                        className={`relative w-11 h-6 rounded-full transition-colors overflow-hidden ${form.notificationOn ? 'bg-blue-500' : 'bg-gray-300'}`}
                       >
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.notificationOn ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.notificationOn ? 'translate-x-5' : 'translate-x-0'}`} />
                       </button>
                     </div>
 
@@ -710,7 +733,7 @@ export default function TasksClient() {
               </div>
 
               {/* 送信ボタン */}
-              <button onClick={submitTask} disabled={saving || !form.title.trim()}
+              <button onClick={submitTask} disabled={saving || !form.title.trim() || (form.showPremiumDetail && (!form.taskStartAt || !form.taskEndAt))}
                 className="w-full bg-red-600 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving
                   ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />

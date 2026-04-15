@@ -29,6 +29,8 @@ function deriveTasks(g: GoalWithData): (Task & { milestone: Milestone })[] {
               t.monthly_count,
               t.interval_value,
               t.interval_unit,
+              t.task_start_at,
+              t.task_end_at,
             )
           )
           .map((t: any) => ({
