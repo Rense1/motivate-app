@@ -19,9 +19,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
       // セッションなし → 匿名セッションを自動作成
       try {
-        const { error } = await supabase.auth.signInAnonymously()
+        const { data, error } = await supabase.auth.signInAnonymously()
         if (error) {
           console.error('[Anonymous Sign-in] failed:', error.message)
+        } else if (data?.user) {
+          // 🔥 追加：匿名ユーザーの profiles 行を必ず作成
+          await supabase.from('profiles').upsert({ id: data.user.id })
         }
       } catch (e) {
         console.error('[Anonymous Sign-in] unexpected error:', e)
@@ -37,7 +40,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           // settings の signOut() は /login にリダイレクトするのでここには届かない
           // ただしトークン期限切れで自動サインアウトした場合は再作成する
           try {
-            await supabase.auth.signInAnonymously()
+            const { data } = await supabase.auth.signInAnonymously()
+
+            // 🔥 追加：再作成時も profiles 行を保証
+            if (data?.user) {
+              await supabase.from('profiles').upsert({ id: data.user.id })
+            }
+
           } catch (e) {
             console.error('[Anonymous Sign-in] re-create failed:', e)
           }
