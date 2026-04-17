@@ -1,8 +1,8 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
+# ============================
+# Dependencies
+# ============================
+node_modules/
+.pnp/
 .pnp.*
 .yarn/*
 !.yarn/patches
@@ -10,35 +10,71 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
+# ============================
+# Testing
+# ============================
+coverage/
 
-# next.js
-/.next/
-/out/
+# ============================
+# Next.js
+# ============================
+.next/
+out/
 
-# production
-/build
+# ============================
+# Production builds
+# ============================
+build/
 
-# misc
+# ============================
+# Expo / React Native (if using EAS)
+# ============================
+.expo/
+.expo-shared/
+android/app/build/
+ios/build/
+ios/Pods/
+
+# ============================
+# Supabase auto-generated files
+# ============================
+supabase/.branches/
+supabase/.temp/
+supabase/.config/
+supabase/functions/.netlify/
+
+# ============================
+# Environment variables
+# ============================
+.env*
+!.env.example
+
+# ============================
+# OS junk files
+# ============================
 .DS_Store
-*.pem
+Thumbs.db
 
-# debug
+# ============================
+# Debug logs
+# ============================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# ============================
+# Vercel
+# ============================
+.vercel/
 
-# vercel
-.vercel
-
-# typescript
+# ============================
+# TypeScript
+# ============================
 *.tsbuildinfo
 next-env.d.ts
 
+# ============================
 # Claude Code local settings
+# ============================
 .claude/
