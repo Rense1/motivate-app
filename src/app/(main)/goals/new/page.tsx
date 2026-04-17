@@ -58,13 +58,15 @@ export default function NewGoalPage() {
     setError(null)
 
     try {
-      let { data: { user } } = await supabase.auth.getUser()
+      // getSession() はローカル Cookie を読むだけなのでネットワーク不要・失敗しない
+      const { data: { session } } = await supabase.auth.getSession()
+      let user = session?.user ?? null
 
       if (!user) {
         const { data } = await supabase.auth.signInAnonymously()
         user = data.user
       }
-      if (!user) { setError('ログインが必要です'); return }
+      if (!user) { setError(t('goals.sessionError')); return }
 
       // フリープランの目標数上限チェック
       const { data: profile } = await supabase

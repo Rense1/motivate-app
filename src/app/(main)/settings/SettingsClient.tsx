@@ -33,7 +33,10 @@ export default function SettingsClient() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      setIsAnonymous(user.is_anonymous ?? false)
+      // is_anonymous が未設定の場合でも app_metadata.provider で判定する
+      const isAnon = user.is_anonymous === true ||
+        (user.app_metadata as Record<string, unknown>)?.['provider'] === 'anonymous'
+      setIsAnonymous(isAnon)
       setEmail(user.email || '')
 
       const { data: prof } = await supabase
@@ -122,15 +125,13 @@ export default function SettingsClient() {
             <div className="text-center">
               <p className="text-sm font-medium text-gray-600">{t('settings.guestAccount')}</p>
               <p className="text-xs text-gray-400 mt-0.5">{t('settings.guestNote')}</p>
-              {isPremium && (
-                <Link
-                  href="/signup"
-                  className="mt-3 inline-flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-sm hover:bg-red-700 transition"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  {t('settings.createAccount')}
-                </Link>
-              )}
+              <Link
+                href="/signup"
+                className="mt-3 inline-flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-sm hover:bg-red-700 transition"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                {t('settings.createAccount')}
+              </Link>
             </div>
           )}
         </div>

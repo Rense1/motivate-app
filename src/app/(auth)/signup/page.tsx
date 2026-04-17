@@ -52,7 +52,8 @@ export default function SignupPage() {
 
     // 現在匿名ユーザーかどうか確認
     const { data: { user: currentUser } } = await supabase.auth.getUser()
-    const isAnonymous = currentUser?.is_anonymous ?? false
+    const isAnonymous = currentUser?.is_anonymous === true ||
+      (currentUser?.app_metadata as Record<string, unknown>)?.['provider'] === 'anonymous'
 
     let userId: string | null = null
     let signupError: string | null = null

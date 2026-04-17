@@ -10,18 +10,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const supabase = createClient()
 
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) {
+    // getSession() はローカルストレージ/Cookie から読むため、ネットワーク不要で高速・安定
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
         setReady(true)
         return
       }
 
-      // 非ログインユーザーは匿名セッションを自動作成
-      // (Supabase ダッシュボード > Authentication > Providers で Anonymous を有効化すること)
+      // セッションなし → 匿名セッションを自動作成
       try {
         const { error } = await supabase.auth.signInAnonymously()
         if (error) {
-          // Supabase Dashboard > Authentication > Providers > Anonymous Sign-ins を有効化してください
           console.error('[Anonymous Sign-in] failed:', error.message)
         }
       } catch (e) {
@@ -29,6 +28,24 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       }
       setReady(true)
     })
+
+    // トークンリフレッシュ失敗時に匿名セッションを再作成
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'TOKEN_REFRESHED') return
+        if (event === 'SIGNED_OUT' && !session) {
+          // settings の signOut() は /login にリダイレクトするのでここには届かない
+          // ただしトークン期限切れで自動サインアウトした場合は再作成する
+          try {
+            await supabase.auth.signInAnonymously()
+          } catch (e) {
+            console.error('[Anonymous Sign-in] re-create failed:', e)
+          }
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
   }, [])
 
   if (!ready) return null
