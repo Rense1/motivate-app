@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Goal } from '@/lib/types'
 import { ImagePlus, Edit2, Check } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 interface VisionBoardProps {
   goal: Goal
@@ -11,6 +12,7 @@ interface VisionBoardProps {
 }
 
 export default function VisionBoard({ goal, onUpdate }: VisionBoardProps) {
+  const { t } = useI18n()
   const [editingText, setEditingText] = useState(false)
   const [text, setText] = useState(goal.vision_text || '')
   const [uploading, setUploading] = useState(false)
@@ -56,7 +58,7 @@ export default function VisionBoard({ goal, onUpdate }: VisionBoardProps) {
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gray-800">
           <ImagePlus className="w-10 h-10 text-gray-400" />
-          <p className="text-gray-400 text-sm">理想の未来の画像を追加</p>
+          <p className="text-gray-400 text-sm">{t('home.visionPlaceholder')}</p>
         </div>
       )}
 
@@ -74,7 +76,7 @@ export default function VisionBoard({ goal, onUpdate }: VisionBoardProps) {
               value={text}
               onChange={e => setText(e.target.value)}
               className="flex-1 bg-white/20 backdrop-blur text-white placeholder-white/60 rounded-xl px-3 py-2 text-sm outline-none border border-white/40"
-              placeholder="理想の未来を一言で..."
+              placeholder={t('home.visionTextPlaceholder')}
             />
             <button onClick={saveText} className="bg-white rounded-xl p-2">
               <Check className="w-4 h-4 text-red-600" />
@@ -88,19 +90,19 @@ export default function VisionBoard({ goal, onUpdate }: VisionBoardProps) {
             {goal.vision_text ? (
               <p className="text-white font-bold text-lg drop-shadow-lg flex-1">{goal.vision_text}</p>
             ) : (
-              <p className="text-white/60 text-sm flex-1">タップしてビジョンを追加...</p>
+              <p className="text-white/60 text-sm flex-1">{t('home.visionTextHint')}</p>
             )}
             <Edit2 className="w-4 h-4 text-white/70 flex-shrink-0" />
           </div>
         )}
       </div>
 
-      {/* Upload button — free for all users */}
+      {/* Upload button */}
       <button
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
         className="absolute top-3 right-3 bg-white/80 backdrop-blur rounded-full p-2 shadow"
-        aria-label="画像をアップロード"
+        aria-label={t('home.uploadImage')}
       >
         {uploading ? (
           <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />

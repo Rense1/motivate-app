@@ -9,8 +9,12 @@ import Link from 'next/link'
 import Modal from '@/components/ui/Modal'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCrownCount } from '@/lib/useCrownCount'
+import { useTutorial } from '@/hooks/useTutorial'
+import { MilestoneTutorialBanner, TutorialBlockingOverlay } from '@/components/tutorial/TutorialOverlay'
+import { useI18n } from '@/lib/i18n'
 
 export default function MilestonesClient() {
+  const { t } = useI18n()
   const searchParams = useSearchParams()
   const goalId = searchParams.get('goalId') || ''
   const router = useRouter()
@@ -22,9 +26,11 @@ export default function MilestonesClient() {
   const [newTitle, setNewTitle] = useState('')
   const [adding, setAdding] = useState(false)
   const [loading, setLoading] = useState(true)
-  // Track which visual index is centered in the roadmap
   const [activeVisualIndex, setActiveVisualIndex] = useState(0)
   const crownCount = useCrownCount()
+
+  const { isMsPending, advanceToTaskTutorial, skipTutorial } = useTutorial()
+  const [tutorialVisible, setTutorialVisible] = useState(false)
 
   useEffect(() => {
     if (!goalId) { router.replace('/goals'); return }
@@ -39,6 +45,11 @@ export default function MilestonesClient() {
       setGoal(goal)
       setMilestones(milestones || [])
       setLoading(false)
+
+      // チュートリアル予約中なら表示
+      if (isMsPending()) {
+        setTimeout(() => setTutorialVisible(true), 700)
+      }
     }
     fetchData()
   }, [goalId])
@@ -47,11 +58,15 @@ export default function MilestonesClient() {
     setMilestones(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m))
   }
 
+  function handleTutorialCardTap() {
+    setTutorialVisible(false)
+    advanceToTaskTutorial()
+  }
+
   async function addMilestone() {
     if (!newTitle.trim()) return
     setAdding(true)
 
-    // Always append at the end to avoid order_index conflicts
     const insertAt = milestones.length
 
     const { data, error } = await supabase
@@ -70,6 +85,7 @@ export default function MilestonesClient() {
   if (loading || !goal) return null
 
   const achieved = milestones.filter(m => m.is_achieved).length
+  const tutorialActive = isMsPending()
 
   return (
     <div className="page-enter flex flex-col h-screen bg-gray-50">
@@ -87,7 +103,7 @@ export default function MilestonesClient() {
           )}
           <div>
             <h1 className="text-base font-bold text-gray-800 leading-tight">{goal.title}</h1>
-            <p className="text-xs text-gray-500">{achieved}/{milestones.length} 達成</p>
+            <p className="text-xs text-gray-500">{achieved}/{milestones.length} {t('goals.achieved')}</p>
           </div>
         </div>
         <button
@@ -95,7 +111,7 @@ export default function MilestonesClient() {
           className="bg-red-600 text-white rounded-xl px-3 py-2 flex items-center gap-1 text-sm font-semibold"
         >
           <Plus className="w-4 h-4" />
-          追加
+          {t('milestone.add')}
         </button>
       </div>
 
@@ -106,16 +122,34 @@ export default function MilestonesClient() {
         visionImageUrl={goal.vision_image_url}
         onMilestoneUpdate={handleMilestoneUpdate}
         onActiveIndexChange={setActiveVisualIndex}
+        tutorialActive={tutorialActive}
+        onTutorialCardTap={handleTutorialCardTap}
       />
 
-      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="マイルストーンを追加">
+      {/* チュートリアル: ブロッキングオーバーレイ + スキップ */}
+      <TutorialBlockingOverlay
+        visible={tutorialVisible}
+        onSkip={() => { setTutorialVisible(false); skipTutorial() }}
+        skipLabel={t('tutorial.skip')}
+      />
+
+      {/* チュートリアルバナー */}
+      <MilestoneTutorialBanner
+        visible={tutorialVisible}
+        message={t('tutorial.tapForTasks')}
+        hint={t('tutorial.tapHint')}
+        tapAction={t('tutorial.tapAction')}
+        onDismiss={() => setTutorialVisible(false)}
+      />
+
+      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title={t('milestone.addTitle')}>
         <div className="space-y-4">
           <input
             autoFocus
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addMilestone()}
-            placeholder="例：英単語を1000個覚える"
+            placeholder={t('milestone.addPlaceholder')}
             className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           <button
@@ -123,7 +157,7 @@ export default function MilestonesClient() {
             disabled={adding || !newTitle.trim()}
             className="w-full bg-red-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50"
           >
-            {adding ? '追加中...' : '追加する'}
+            {adding ? t('milestone.adding') : t('milestone.addButton')}
           </button>
         </div>
       </Modal>

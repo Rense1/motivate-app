@@ -4,6 +4,7 @@ import { Milestone } from '@/lib/types'
 import Link from 'next/link'
 import { ChevronRight, Crown } from 'lucide-react'
 import { getMilestoneRank, RANK_META, RANK_BG } from '@/lib/progressUtils'
+import { useI18n } from '@/lib/i18n'
 
 interface MilestoneProgressProps {
   milestones: Milestone[]
@@ -12,6 +13,7 @@ interface MilestoneProgressProps {
 }
 
 export default function MilestoneProgress({ milestones, goalId, goalTitle }: MilestoneProgressProps) {
+  const { t } = useI18n()
   const total = milestones.length
   const achieved = milestones.filter(m => m.is_achieved).length
   const current = milestones.find(m => !m.is_achieved) ?? null
@@ -24,18 +26,18 @@ export default function MilestoneProgress({ milestones, goalId, goalTitle }: Mil
     <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold text-gray-800">マイルストーン</h2>
+        <h2 className="text-sm font-bold text-gray-800">{t('home.milestoneSection')}</h2>
         <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
           {achieved}/{total}
         </span>
       </div>
 
       {total === 0 ? (
-        <p className="text-gray-400 text-xs">マイルストーンがありません</p>
+        <p className="text-gray-400 text-xs">{t('home.noMilestones')}</p>
       ) : allDone ? (
         <div className="text-center py-4">
           <Crown className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-          <p className="text-sm font-bold text-yellow-600">🏆 全て達成！</p>
+          <p className="text-sm font-bold text-yellow-600">{t('home.allDoneShort')}</p>
         </div>
       ) : (
         <Link href={`/milestones?goalId=${goalId}`} className="block space-y-2">
@@ -77,7 +79,7 @@ export default function MilestoneProgress({ milestones, goalId, goalTitle }: Mil
             }}
           >
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>
-              現在のマイルストーン
+              {t('home.currentMilestone')}
             </p>
             <p className="text-white font-bold text-sm leading-snug">
               {current!.title}
@@ -92,7 +94,7 @@ export default function MilestoneProgress({ milestones, goalId, goalTitle }: Mil
           href={`/milestones?goalId=${goalId}`}
           className="flex items-center justify-end gap-0.5 mt-3 text-xs font-semibold text-red-600"
         >
-          詳細を見る <ChevronRight className="w-3.5 h-3.5" />
+          {t('home.viewDetail')} <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       )}
     </div>

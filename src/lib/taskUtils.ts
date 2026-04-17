@@ -216,6 +216,40 @@ export function frequencyLabel(
   }
 }
 
+/**
+ * Localized human-readable label for frequency.
+ * Pass the `t` function from useI18n() and the current `lang`.
+ */
+export function localizedFrequencyLabel(
+  frequency: TaskFrequency,
+  t: (key: string) => string,
+  lang: string,
+  monthlyCount?: number | null,
+  intervalValue?: number | null,
+  intervalUnit?: IntervalUnit | null,
+): string {
+  const n = monthlyCount ?? 1
+  const iv = intervalValue ?? 1
+  const iu = intervalUnit ?? 'week'
+  const unitLabel = iu === 'day' ? t('tasks.day') : iu === 'week' ? t('tasks.week') : t('tasks.month')
+
+  switch (frequency) {
+    case 'daily':        return t('tasks.daily')
+    case 'weekly':       return t('tasks.weekly')
+    case 'none':         return t('tasks.once')
+    case 'weekly_2':     return t('tasks.weekly2')
+    case 'every_3_days': return t('tasks.every3days')
+    case 'monthly_n':
+      return lang === 'ja'
+        ? `${t('tasks.monthly')}${n}${t('tasks.times')}`
+        : `${n}x ${t('tasks.monthly')}`
+    case 'custom':
+      return lang === 'ja'
+        ? `${iv}${unitLabel}${t('tasks.per')}${n}${t('tasks.times')}`
+        : `${iv} ${unitLabel}, ${n}x`
+  }
+}
+
 // ── 期間カウント更新ロジック ──────────────────────────────────────────────
 
 /**

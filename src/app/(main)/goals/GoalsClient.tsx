@@ -9,12 +9,35 @@ import { useCrownCount } from '@/lib/useCrownCount'
 import { usePremium } from '@/lib/usePremium'
 import PremiumModal from '@/components/ui/PremiumModal'
 import { useRouter } from 'next/navigation'
+import { useI18n } from '@/lib/i18n'
+import type { Lang } from '@/lib/i18n'
 
 type GoalWithMilestones = Goal & { milestones: Milestone[] }
+
+function deadlineBadge(deadline: string | null, lang: Lang, t: (k: string) => string): { text: string; urgent: boolean } | null {
+  if (!deadline) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const dl = new Date(deadline)
+  dl.setHours(0, 0, 0, 0)
+  const diff = Math.round((dl.getTime() - today.getTime()) / 86400000)
+  if (diff === 0) return { text: t('goals.deadlineToday'), urgent: true }
+  if (diff > 0) {
+    return {
+      text: lang === 'ja' ? `残り${diff}${t('goals.daysLeft')}` : `${diff}${t('goals.daysLeft')}`,
+      urgent: diff <= 7,
+    }
+  }
+  return {
+    text: lang === 'ja' ? `${-diff}${t('goals.daysOver')}` : `${-diff}${t('goals.daysOver')}`,
+    urgent: true,
+  }
+}
 
 const FREE_GOAL_LIMIT = 2
 
 export default function GoalsClient() {
+  const { t, lang } = useI18n()
   const [goals, setGoals] = useState<GoalWithMilestones[]>([])
   const [loading, setLoading] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -29,7 +52,7 @@ export default function GoalsClient() {
   useEffect(() => {
     async function fetchData() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setLoading(false); return }
       const { data: goals } = await supabase
         .from('goals').select('*, milestones(*)').eq('user_id', user.id).order('created_at')
       setGoals(goals || [])
@@ -70,7 +93,7 @@ export default function GoalsClient() {
   }
 
   async function deleteGoal(id: string) {
-    if (!confirm('この目標を削除しますか？')) return
+    if (!confirm(t('goals.deleteConfirm'))) return
     await supabase.from('goals').delete().eq('id', id)
     setGoals(prev => prev.filter(g => g.id !== id))
   }
@@ -88,26 +111,26 @@ export default function GoalsClient() {
               <span className="text-xs font-black text-yellow-600">{crownCount}</span>
             </div>
           )}
-          <h1 className="text-2xl font-bold text-gray-900">目標一覧</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('goals.title')}</h1>
         </div>
         <button
           onClick={handleAddGoal}
           className="bg-red-600 text-white rounded-2xl px-4 py-2 flex items-center gap-1.5 text-sm font-bold shadow-sm"
         >
           <Plus className="w-4 h-4" />
-          追加
+          {t('goals.add')}
         </button>
       </div>
 
       {goals.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center pb-20">
-          <p className="text-gray-400 mb-6">まだ目標がありません</p>
+          <p className="text-gray-400 mb-6">{t('goals.empty')}</p>
           <button
             onClick={handleAddGoal}
             className="bg-red-600 text-white px-6 py-3 rounded-2xl font-semibold inline-flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
-            最初の目標を作る
+            {t('goals.addFirst')}
           </button>
         </div>
       ) : (
@@ -123,6 +146,7 @@ export default function GoalsClient() {
             const achieved = goal.milestones?.filter(m => m.is_achieved).length || 0
             const progress = total > 0 ? Math.round((achieved / total) * 100) : 0
             const isActive = index === activeIndex
+            const dlBadge = deadlineBadge(goal.deadline ?? null, lang, t)
 
             return (
               <div
@@ -155,8 +179,17 @@ export default function GoalsClient() {
                       <div className="absolute rounded-full bg-white/8" style={{ width: 240, height: 240, top: -60, right: -60 }} />
                       <div className="absolute rounded-full bg-white/5" style={{ width: 160, height: 160, bottom: -40, left: -40 }} />
 
-                      <div className="relative">
-                        <span className="text-red-200 text-xs font-bold uppercase tracking-widest">目標</span>
+                      <div className="relative flex items-start justify-between">
+                        <span className="text-red-200 text-xs font-bold uppercase tracking-widest">{t('goals.goal')}</span>
+                        {dlBadge && (
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                            dlBadge.urgent
+                              ? 'bg-white/25 text-white'
+                              : 'bg-white/15 text-white/80'
+                          }`}>
+                            {dlBadge.text}
+                          </span>
+                        )}
                       </div>
 
                       <div className="relative flex-1 flex items-center py-4">
@@ -167,8 +200,8 @@ export default function GoalsClient() {
 
                       <div className="relative">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-white/70 text-xs font-medium">マイルストーン進捗</span>
-                          <span className="text-white text-sm font-bold">{achieved}/{total} 達成</span>
+                          <span className="text-white/70 text-xs font-medium">{t('goals.progress')}</span>
+                          <span className="text-white text-sm font-bold">{achieved}/{total} {t('goals.achieved')}</span>
                         </div>
                         <div className="bg-white/20 rounded-full h-2">
                           <div className="bg-white h-2 rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
@@ -184,7 +217,7 @@ export default function GoalsClient() {
                       href={`/milestones?goalId=${goal.id}`}
                       className="flex items-center gap-1.5 text-sm font-bold text-red-600"
                     >
-                      マイルストーンを見る
+                      {t('goals.milestonesLink')}
                       <ChevronRight className="w-4 h-4" />
                     </Link>
                     <button
@@ -218,7 +251,7 @@ export default function GoalsClient() {
       <PremiumModal
         isOpen={premiumModalOpen}
         onClose={() => setPremiumModalOpen(false)}
-        featureName="3つ目以降の目標追加"
+        featureName={t('goals.moreGoals')}
       />
     </div>
   )

@@ -3,18 +3,23 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types'
-import { Camera, Check, Gem, LogOut, X, Crown } from 'lucide-react'
+import { Camera, Check, Gem, LogOut, X, Crown, Globe, UserPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import PremiumModal from '@/components/ui/PremiumModal'
 import { usePremiumStore } from '@/lib/premiumStore'
+import { useI18n } from '@/lib/i18n'
+import type { Lang } from '@/lib/i18n'
 
 export default function SettingsClient() {
+  const { t, lang, setLang } = useI18n()
   const supabase = createClient()
   const router   = useRouter()
   const { setPremium: setGlobalPremium } = usePremiumStore()
 
   const [profile, setProfile]             = useState<Profile | null>(null)
   const [email, setEmail]                 = useState('')
+  const [isAnonymous, setIsAnonymous]     = useState(false)
   const [displayName, setDisplayName]     = useState('')
   const [editingName, setEditingName]     = useState(false)
   const [savingName, setSavingName]       = useState(false)
@@ -26,13 +31,15 @@ export default function SettingsClient() {
   useEffect(() => {
     async function fetchData() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setLoading(false); return }
+
+      setIsAnonymous(user.is_anonymous ?? false)
+      setEmail(user.email || '')
 
       const { data: prof } = await supabase
         .from('profiles').select('*').eq('id', user.id).single()
 
       setProfile(prof)
-      setEmail(user.email || '')
       setDisplayName(prof?.display_name || '')
       if (prof) setGlobalPremium(prof.is_premium ?? false)
       setLoading(false)
@@ -72,14 +79,19 @@ export default function SettingsClient() {
     router.push('/login')
   }
 
+  function handleLangChange(l: Lang) {
+    setLang(l)
+  }
+
   if (loading) return null
 
   const isPremium = profile?.is_premium ?? false
+  const displayInitial = (profile?.display_name || email || 'R')[0]?.toUpperCase() || 'R'
 
   return (
     <div className="page-enter min-h-screen bg-gray-100">
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur px-4 py-3 border-b border-gray-200">
-        <h1 className="text-lg font-bold text-gray-800">設定</h1>
+        <h1 className="text-lg font-bold text-gray-800">{t('settings.title')}</h1>
       </div>
 
       <div className="p-4 space-y-4">
@@ -92,55 +104,74 @@ export default function SettingsClient() {
                 className="w-20 h-20 rounded-full object-cover ring-2 ring-red-100" />
             ) : (
               <div className="w-20 h-20 rounded-full bg-red-600 flex items-center justify-center ring-2 ring-red-100">
-                <span className="text-white text-2xl font-bold">
-                  {(profile?.display_name || email)[0]?.toUpperCase() || 'R'}
-                </span>
+                <span className="text-white text-2xl font-bold">{displayInitial}</span>
               </div>
             )}
-            <button onClick={() => fileRef.current?.click()} disabled={uploadingAvatar}
-              className="absolute bottom-0 right-0 bg-white rounded-full p-1.5 shadow border border-gray-200">
-              {uploadingAvatar
-                ? <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                : <Camera className="w-4 h-4 text-gray-600" />}
-            </button>
+            {!isAnonymous && (
+              <button onClick={() => fileRef.current?.click()} disabled={uploadingAvatar}
+                className="absolute bottom-0 right-0 bg-white rounded-full p-1.5 shadow border border-gray-200">
+                {uploadingAvatar
+                  ? <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                  : <Camera className="w-4 h-4 text-gray-600" />}
+              </button>
+            )}
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-          <p className="text-sm text-gray-500">プロフィール写真を変更</p>
-        </div>
-
-        {/* プロフィール情報 */}
-        <div className="bg-white rounded-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs text-gray-500 mb-0.5">ユーザー名</p>
-              {editingName ? (
-                <input autoFocus value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
-                  className="text-gray-800 font-medium text-sm w-full outline-none border-b border-red-300"
-                  placeholder="名前を入力" />
-              ) : (
-                <p className="text-gray-800 font-medium text-sm">{profile?.display_name || '未設定'}</p>
+          {!isAnonymous && <p className="text-sm text-gray-500">{t('settings.avatar')}</p>}
+          {isAnonymous && (
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-600">{t('settings.guestAccount')}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{t('settings.guestNote')}</p>
+              {isPremium && (
+                <Link
+                  href="/signup"
+                  className="mt-3 inline-flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-sm hover:bg-red-700 transition"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  {t('settings.createAccount')}
+                </Link>
               )}
             </div>
-            {editingName ? (
-              <div className="flex gap-2">
-                <button onClick={() => { setEditingName(false); setDisplayName(profile?.display_name || '') }}
-                  className="p-1.5 text-gray-400"><X className="w-4 h-4" /></button>
-                <button onClick={saveDisplayName} disabled={savingName}
-                  className="p-1.5 text-red-600"><Check className="w-4 h-4" /></button>
-              </div>
-            ) : (
-              <button onClick={() => setEditingName(true)} className="text-xs text-red-600 font-medium">編集</button>
-            )}
-          </div>
-          <div className="px-4 py-3">
-            <p className="text-xs text-gray-500 mb-0.5">メールアドレス</p>
-            <p className="text-gray-800 font-medium text-sm">{email}</p>
-          </div>
+          )}
         </div>
 
-        {/* プレミアムプラン（表示のみ・変更不可） */}
+        {/* プロフィール情報（匿名以外のみ） */}
+        {!isAnonymous && (
+          <div className="bg-white rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-0.5">{t('settings.username')}</p>
+                {editingName ? (
+                  <input autoFocus value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
+                    className="text-gray-800 font-medium text-sm w-full outline-none border-b border-red-300"
+                    placeholder={t('settings.unset')} />
+                ) : (
+                  <p className="text-gray-800 font-medium text-sm">{profile?.display_name || t('settings.unset')}</p>
+                )}
+              </div>
+              {editingName ? (
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditingName(false); setDisplayName(profile?.display_name || '') }}
+                    className="p-1.5 text-gray-400"><X className="w-4 h-4" /></button>
+                  <button onClick={saveDisplayName} disabled={savingName}
+                    className="p-1.5 text-red-600"><Check className="w-4 h-4" /></button>
+                </div>
+              ) : (
+                <button onClick={() => setEditingName(true)} className="text-xs text-red-600 font-medium">
+                  {t('settings.editName')}
+                </button>
+              )}
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-xs text-gray-500 mb-0.5">{t('settings.email')}</p>
+              <p className="text-gray-800 font-medium text-sm">{email || t('settings.noEmail')}</p>
+            </div>
+          </div>
+        )}
+
+        {/* プレミアムプラン */}
         <button
           onClick={() => setPremiumModalOpen(true)}
           className={`w-full rounded-2xl overflow-hidden text-left ${
@@ -156,9 +187,9 @@ export default function SettingsClient() {
                 : <Gem className="w-4 h-4 text-gray-500" />}
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-gray-800">プレミアムプラン</p>
+              <p className="text-sm font-bold text-gray-800">{t('settings.premiumPlan')}</p>
               <p className={`text-xs font-medium ${isPremium ? 'text-yellow-600' : 'text-gray-400'}`}>
-                {isPremium ? '✅ 利用中' : 'フリープラン — タップして詳細を見る'}
+                {isPremium ? t('settings.usingPremium') : t('settings.freePlan')}
               </p>
             </div>
             {!isPremium && (
@@ -169,13 +200,37 @@ export default function SettingsClient() {
           </div>
         </button>
 
-        {/* ログアウト */}
+        {/* 言語設定 */}
         <div className="bg-white rounded-2xl overflow-hidden">
-          <button onClick={signOut} className="w-full px-4 py-4 flex items-center gap-3 text-red-600">
-            <LogOut className="w-5 h-5" />
-            <span className="text-sm font-medium">ログアウト</span>
-          </button>
+          <div className="px-4 py-4 flex items-center gap-3">
+            <Globe className="w-5 h-5 text-gray-500" />
+            <p className="text-sm font-medium text-gray-800 flex-1">{t('settings.language')}</p>
+            <div className="flex rounded-xl overflow-hidden border border-gray-200 text-xs font-bold">
+              <button
+                onClick={() => handleLangChange('ja')}
+                className={`px-3 py-1.5 transition ${lang === 'ja' ? 'bg-red-600 text-white' : 'bg-white text-gray-600'}`}
+              >
+                {t('settings.languageJa')}
+              </button>
+              <button
+                onClick={() => handleLangChange('en')}
+                className={`px-3 py-1.5 transition ${lang === 'en' ? 'bg-red-600 text-white' : 'bg-white text-gray-600'}`}
+              >
+                {t('settings.languageEn')}
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* ログアウト（匿名以外のみ） */}
+        {!isAnonymous && (
+          <div className="bg-white rounded-2xl overflow-hidden">
+            <button onClick={signOut} className="w-full px-4 py-4 flex items-center gap-3 text-red-600">
+              <LogOut className="w-5 h-5" />
+              <span className="text-sm font-medium">{t('settings.logout')}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <PremiumModal isOpen={premiumModalOpen} onClose={() => setPremiumModalOpen(false)} />

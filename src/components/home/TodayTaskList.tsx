@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Task, Milestone } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { CheckCircle2, Circle } from 'lucide-react'
-import { calcPeriodUpdate, frequencyLabel } from '@/lib/taskUtils'
+import { calcPeriodUpdate, localizedFrequencyLabel } from '@/lib/taskUtils'
+import { useI18n } from '@/lib/i18n'
 
 interface TodayTaskListProps {
   tasks: (Task & { milestone: Milestone })[]
@@ -12,13 +13,13 @@ interface TodayTaskListProps {
 }
 
 export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProps) {
+  const { t, lang } = useI18n()
   const supabase = createClient()
   const [animId, setAnimId] = useState<string | null>(null)
 
   async function toggleTask(task: Task) {
     const newCompleted = !task.is_completed_today
 
-    // チェック完了時にアニメーション発火
     if (newCompleted) {
       setAnimId(task.id)
       setTimeout(() => setAnimId(null), 500)
@@ -58,7 +59,7 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
   return (
     <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold text-gray-800">今日のタスク</h2>
+        <h2 className="text-sm font-bold text-gray-800">{t('home.today')}</h2>
         {tasks.length > 0 && (
           <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
             {completed}/{tasks.length}
@@ -67,7 +68,7 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
       </div>
 
       {tasks.length === 0 ? (
-        <p className="text-gray-400 text-xs">タスクがありません</p>
+        <p className="text-gray-400 text-xs">{t('home.noTasks')}</p>
       ) : (
         <div className="space-y-3">
           {tasks.map(task => (
@@ -87,7 +88,6 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
                 ) : (
                   <Circle className="w-5 h-5 text-gray-300 group-active:text-gray-400 transition-colors" />
                 )}
-                {/* 完了時のリップルエフェクト */}
                 {animId === task.id && (
                   <span
                     className="absolute inset-[-4px] rounded-full bg-red-400/30 pointer-events-none"
@@ -105,7 +105,7 @@ export default function TodayTaskList({ tasks, onTaskToggle }: TodayTaskListProp
                 {(task.frequency === 'weekly_2' || task.frequency === 'every_3_days' ||
                   task.frequency === 'monthly_n' || task.frequency === 'custom') && (
                   <span className="block text-[10px] text-gray-400 mt-0.5">
-                    {frequencyLabel(task.frequency, task.monthly_count, task.interval_value, task.interval_unit)}
+                    {localizedFrequencyLabel(task.frequency, t, lang, task.monthly_count, task.interval_value, task.interval_unit)}
                   </span>
                 )}
               </div>

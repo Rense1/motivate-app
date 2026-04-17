@@ -2,21 +2,32 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/ui/BottomNav'
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        router.replace('/login')
-      } else {
+
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) {
         setReady(true)
+        return
       }
+
+      // 非ログインユーザーは匿名セッションを自動作成
+      // (Supabase ダッシュボード > Authentication > Providers で Anonymous を有効化すること)
+      try {
+        const { error } = await supabase.auth.signInAnonymously()
+        if (error) {
+          // Supabase Dashboard > Authentication > Providers > Anonymous Sign-ins を有効化してください
+          console.error('[Anonymous Sign-in] failed:', error.message)
+        }
+      } catch (e) {
+        console.error('[Anonymous Sign-in] unexpected error:', e)
+      }
+      setReady(true)
     })
   }, [])
 

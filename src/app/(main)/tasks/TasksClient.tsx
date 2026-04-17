@@ -19,16 +19,11 @@ import {
   type NotifEntry,
 } from '@/lib/notifications'
 import { syncWidgetTasks, syncWidgetPremium } from '@/lib/widgetPlugin'
+import { useTutorial } from '@/hooks/useTutorial'
+import { TutorialTooltip, TutorialBlockingOverlay } from '@/components/tutorial/TutorialOverlay'
+import { useI18n } from '@/lib/i18n'
 
-// ── 曜日ラベル ────────────────────────────────────────────────────────────
-const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
-
-// ── 基本頻度 ──────────────────────────────────────────────────────────────
-const BASIC_FREQUENCIES: { value: TaskFrequency; label: string }[] = [
-  { value: 'daily',  label: '毎日' },
-  { value: 'weekly', label: '毎週' },
-  { value: 'none',   label: '1回' },
-]
+// DAY_LABELS is computed from i18n dict inside the component
 
 // datetime-local 文字列 (YYYY-MM-DDTHH:mm) に変換
 function toDatetimeLocal(iso: string): string {
@@ -75,12 +70,20 @@ function newNotifId() {
 }
 
 export default function TasksClient() {
+  const { t, dict, lang } = useI18n()
+  const DAY_LABELS = dict.tasks.dayLabels
   const searchParams = useSearchParams()
   const goalId      = searchParams.get('goalId')
   const milestoneId = searchParams.get('milestoneId')
   const router      = useRouter()
   const supabase    = createClient()
   const isPremium   = usePremium()
+
+  const { isTaskPending, completeTutorial, skipTutorial } = useTutorial()
+
+  // チュートリアルステップ
+  type TutStep = 'add_btn' | 'input' | 'frequency' | null
+  const [tutStep, setTutStep] = useState<TutStep>(null)
 
   const [milestone, setMilestone] = useState<Milestone | null>(null)
   const [tasks, setTasks]         = useState<Task[]>([])
@@ -93,14 +96,17 @@ export default function TasksClient() {
 
   const [deadline, setDeadline]             = useState('')
   const [savingDeadline, setSavingDeadline] = useState(false)
-  const [deadlineOpen, setDeadlineOpen]     = useState(false)
-
-  const [reasonText, setReasonText]     = useState('')
-  const [reasonId, setReasonId]         = useState<string | null>(null)
-  const [savingReason, setSavingReason] = useState(false)
+  const [deadlineEditing, setDeadlineEditing] = useState(false)
 
   const [premiumModalOpen, setPremiumModalOpen]     = useState(false)
   const [premiumFeatureName, setPremiumFeatureName] = useState('')
+
+  // i18n で頻度ラベルを組む
+  const BASIC_FREQUENCIES = [
+    { value: 'daily'  as TaskFrequency, label: t('tasks.daily')  },
+    { value: 'weekly' as TaskFrequency, label: t('tasks.weekly') },
+    { value: 'none'   as TaskFrequency, label: t('tasks.once')   },
+  ]
 
   // ── useEffect（hooks は early return より前に置く） ─────────────────────
   useEffect(() => {
@@ -113,44 +119,23 @@ export default function TasksClient() {
 
       if (!ms) { router.replace(`/milestones?goalId=${goalId}`); return }
 
-      const [{ data: taskRows }, { data: reasons }] = await Promise.all([
-        supabase.from('tasks').select('*').eq('milestone_id', milestoneId).order('order_index'),
-        supabase.from('milestone_reasons').select('*').eq('milestone_id', milestoneId).order('order_index').limit(1),
-      ])
+      const { data: taskRows } = await supabase
+        .from('tasks').select('*').eq('milestone_id', milestoneId).order('order_index')
 
       setMilestone(ms)
       setDeadline(ms.deadline || '')
       setTasks(taskRows || [])
       syncWidgetTasks((taskRows ?? []).map(t => t.title))
       syncWidgetPremium(isPremium ?? false)
-
-      if (reasons?.[0]) {
-        setReasonText(reasons[0].reason)
-        setReasonId(reasons[0].id)
-      }
       setLoading(false)
+
+      // チュートリアル: タスク追加ボタンをハイライト
+      if (isTaskPending()) setTutStep('add_btn')
     }
     fetchData()
   }, [milestoneId, goalId])
 
   if (!goalId || !milestoneId) return null
-
-  // ── やる理由 ──────────────────────────────────────────────────────────────
-  async function saveReason() {
-    if (!milestoneId) return
-    setSavingReason(true)
-    const trimmed = reasonText.trim()
-    if (reasonId) {
-      await supabase.from('milestone_reasons').update({ reason: trimmed }).eq('id', reasonId)
-    } else if (trimmed) {
-      const { data } = await supabase
-        .from('milestone_reasons')
-        .insert({ milestone_id: milestoneId, reason: trimmed, order_index: 0 })
-        .select().single()
-      if (data) setReasonId(data.id)
-    }
-    setSavingReason(false)
-  }
 
   // ── 編集開始 ──────────────────────────────────────────────────────────────
   function startEdit(task: Task) {
@@ -331,6 +316,12 @@ export default function TasksClient() {
     setForm(emptyForm())
     setFormOpen(false)
     setSaving(false)
+
+    // 新規追加完了でチュートリアル終了
+    if (!editId) {
+      completeTutorial()
+      setTutStep(null)
+    }
   }
 
   // ── 削除 ──────────────────────────────────────────────────────────────────
@@ -343,12 +334,14 @@ export default function TasksClient() {
   }
 
   // ── 期限保存 ──────────────────────────────────────────────────────────────
-  async function saveDeadline() {
+  async function saveDeadline(value?: string) {
+    const dl = value !== undefined ? value : deadline
     setSavingDeadline(true)
-    await supabase.from('milestones').update({ deadline: deadline || null }).eq('id', milestoneId)
+    await supabase.from('milestones').update({ deadline: dl || null }).eq('id', milestoneId)
+    if (value !== undefined) setDeadline(value)
     setSavingDeadline(false)
-    setDeadlineOpen(false)
-    if (milestone) setMilestone({ ...milestone, deadline: deadline || null })
+    setDeadlineEditing(false)
+    if (milestone) setMilestone({ ...milestone, deadline: dl || null })
   }
 
   // ── 通知エントリ操作 ─────────────────────────────────────────────────────
@@ -379,71 +372,60 @@ export default function TasksClient() {
   return (
     <div className="page-enter min-h-screen bg-gray-50">
 
-      {/* ── ヘッダー ────────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <Link href={`/milestones?goalId=${goalId}`} className="p-1.5 rounded-xl hover:bg-gray-100">
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
-          </Link>
-          <p className="text-sm font-semibold text-gray-500">タスク管理</p>
-        </div>
-        <button
-          onClick={() => setDeadlineOpen(prev => !prev)}
-          className={`p-2 rounded-xl transition-colors ${deadlineOpen ? 'bg-red-50' : 'hover:bg-gray-100'}`}
-        >
-          <Calendar className="w-5 h-5 text-red-600" />
-        </button>
-      </div>
+      {/* ── チュートリアル: ブロッキングオーバーレイ + スキップ ─────────────── */}
+      <TutorialBlockingOverlay
+        visible={tutStep !== null}
+        onSkip={() => { setTutStep(null); skipTutorial() }}
+        skipLabel={t('tutorial.skip')}
+      />
 
-      {/* ── 期限設定（折りたたみ） ──────────────────────────────────────────── */}
-      {deadlineOpen && (
-        <div className="sticky top-[57px] z-10 bg-white border-b border-gray-100 shadow-sm">
-          <div className="px-5 py-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-red-500" />マイルストーン期限
-              </p>
-              <button onClick={() => setDeadlineOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
-                <ChevronUp className="w-4 h-4 text-gray-400" />
-              </button>
-            </div>
-            {milestone.deadline && (
-              <p className="text-xs text-gray-500 mb-2">現在: {new Date(milestone.deadline).toLocaleDateString('ja-JP')}</p>
-            )}
-            <div className="flex gap-2">
-              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-                className="flex-1 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" />
-              <button onClick={() => { setDeadline(''); saveDeadline() }}
-                className="px-3 py-2.5 border border-gray-300 text-gray-500 text-xs rounded-xl whitespace-nowrap">削除</button>
-              <button onClick={saveDeadline} disabled={savingDeadline}
-                className="px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl disabled:opacity-50 whitespace-nowrap">
-                {savingDeadline ? '保存中' : '保存'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── ヘッダー ────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur px-4 py-3 flex items-center border-b border-gray-100">
+        <Link href={`/milestones?goalId=${goalId}`} className="p-1.5 rounded-xl hover:bg-gray-100 mr-2">
+          <ChevronLeft className="w-5 h-5 text-gray-600" />
+        </Link>
+        <p className="text-sm font-semibold text-gray-500">{t('tasks.management')}</p>
+      </div>
 
       <div className="px-4 pt-4 pb-8 space-y-4">
 
         {/* ── タスク追加ボタン（収納時）─────────────────────────────────────── */}
         {!formOpen && (
-          <button
-            onClick={() => { setEditId(null); setForm(emptyForm()); setFormOpen(true) }}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-red-300 text-red-500 font-semibold text-sm hover:bg-red-50 transition-colors"
+          <div
+            className="relative"
+            style={tutStep === 'add_btn' ? { position: 'relative', zIndex: 55 } : undefined}
           >
-            <Plus className="w-4 h-4" />タスクを追加
-          </button>
+            <TutorialTooltip
+              visible={tutStep === 'add_btn'}
+              message={`1/3  ${t('tutorial.addTask')}`}
+              arrowDir="down"
+              className="absolute -top-12 left-1/2 -translate-x-1/2"
+            />
+            <button
+              onClick={() => {
+                setEditId(null); setForm(emptyForm()); setFormOpen(true)
+                if (tutStep === 'add_btn') setTutStep('input')
+              }}
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed text-red-500 font-semibold text-sm hover:bg-red-50 transition-colors ${
+                tutStep === 'add_btn' ? 'border-red-500 bg-red-50 animate-pulse' : 'border-red-300'
+              }`}
+            >
+              <Plus className="w-4 h-4" />{t('tasks.addButton')}
+            </button>
+          </div>
         )}
 
         {/* ── タスク追加 / 編集フォーム（展開時）─────────────────────────────── */}
         {formOpen && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div
+            className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+            style={(tutStep === 'input' || tutStep === 'frequency') ? { position: 'relative', zIndex: 55 } : undefined}
+          >
 
             {/* フォームヘッダー */}
             <div className="px-4 pt-4 pb-3 border-b border-gray-50 flex items-center justify-between">
               <p className="text-sm font-bold text-gray-800">
-                {editId ? '✏️ タスクを編集' : '＋ タスクを追加'}
+                {editId ? t('tasks.editForm') : t('tasks.addForm')}
               </p>
               <button onClick={cancelEdit} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400">
                 <X className="w-4 h-4" />
@@ -453,18 +435,35 @@ export default function TasksClient() {
             <div className="px-4 py-3 space-y-3">
 
               {/* タイトル入力 */}
-              <input
-                autoFocus
-                value={form.title}
-                onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && submitTask()}
-                placeholder="例：英語の本を10ページ読む"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-gray-50"
-              />
+              <div className="relative">
+                <TutorialTooltip
+                  visible={tutStep === 'input'}
+                  message={`2/3  ${t('tutorial.writeTask')}`}
+                  arrowDir="down"
+                  className="absolute -top-12 left-1/2 -translate-x-1/2"
+                />
+                <input
+                  autoFocus
+                  value={form.title}
+                  onChange={e => {
+                    setForm(prev => ({ ...prev, title: e.target.value }))
+                    if (tutStep === 'input' && e.target.value.trim()) setTutStep('frequency')
+                  }}
+                  onKeyDown={e => e.key === 'Enter' && submitTask()}
+                  placeholder={t('tasks.titlePlaceholder')}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-gray-50"
+                />
+              </div>
 
               {/* ── 基本頻度 ───────────────────────────────────────────────── */}
-              <div>
-                <p className="text-xs text-gray-500 mb-1.5 font-medium">頻度</p>
+              <div className="relative">
+                <TutorialTooltip
+                  visible={tutStep === 'frequency'}
+                  message={`3/3  ${t('tutorial.setFrequency')}`}
+                  arrowDir="down"
+                  className="absolute -top-12 left-1/2 -translate-x-1/2"
+                />
+                <p className="text-xs text-gray-500 mb-1.5 font-medium">{t('tasks.frequency')}</p>
                 <div className="flex gap-2">
                   {BASIC_FREQUENCIES.map(f => (
                     <button key={f.value} type="button"
@@ -485,7 +484,7 @@ export default function TasksClient() {
               <div>
                 <button type="button"
                   onClick={() => {
-                    if (!isPremium) { setPremiumFeatureName('詳細な頻度・日付設定'); setPremiumModalOpen(true); return }
+                    if (!isPremium) { setPremiumFeatureName(t('tasks.detailFreq')); setPremiumModalOpen(true); return }
                     setForm(prev => ({ ...prev, showPremiumDetail: !prev.showPremiumDetail }))
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs font-semibold transition ${
@@ -496,12 +495,12 @@ export default function TasksClient() {
                 >
                   <span className="flex items-center gap-1.5">
                     {!isPremium && <Lock className="w-3 h-3" />}
-                    詳細な頻度・日付設定
+                    {t('tasks.detailFreq')}
                     {!isPremium
-                      ? <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">Premium</span>
+                      ? <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">{t('tasks.premium')}</span>
                       : form.showPremiumDetail && form.taskStartAt
                         ? <span className="text-yellow-600">
-                            — {form.intervalValue}{form.intervalUnit === 'day' ? '日' : form.intervalUnit === 'week' ? '週' : 'ヶ月'}に{form.timesPerInterval}回
+                            — {form.intervalValue}{form.intervalUnit === 'day' ? t('tasks.day') : form.intervalUnit === 'week' ? t('tasks.week') : t('tasks.month')}{t('tasks.per')}{form.timesPerInterval}{t('tasks.times')}
                           </span>
                         : null
                     }
@@ -517,13 +516,13 @@ export default function TasksClient() {
 
                     {/* 頻度設定 */}
                     <div>
-                      <p className="text-xs font-semibold text-yellow-700 mb-2">頻度設定</p>
+                      <p className="text-xs font-semibold text-yellow-700 mb-2">{t('tasks.freqSettings')}</p>
                       {(() => {
                         const ivMax = form.intervalUnit === 'day' ? 30 : form.intervalUnit === 'week' ? 8 : 12
                         const timesMax = form.intervalUnit === 'day' ? form.intervalValue : form.intervalUnit === 'week' ? 7 : 31
                         return (
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs text-gray-600">毎</span>
+                            <span className="text-xs text-gray-600">{t('tasks.every')}</span>
                             <select
                               value={form.intervalValue}
                               onChange={e => setForm(prev => ({ ...prev, intervalValue: Number(e.target.value) }))}
@@ -547,11 +546,11 @@ export default function TasksClient() {
                               }}
                               className="border border-yellow-300 rounded-lg px-2 py-1.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
                             >
-                              <option value="day">日</option>
-                              <option value="week">週</option>
-                              <option value="month">ヶ月</option>
+                              <option value="day">{t('tasks.day')}</option>
+                              <option value="week">{t('tasks.week')}</option>
+                              <option value="month">{t('tasks.month')}</option>
                             </select>
-                            <span className="text-xs text-gray-600">に</span>
+                            <span className="text-xs text-gray-600">{t('tasks.per')}</span>
                             <select
                               value={form.timesPerInterval}
                               onChange={e => setForm(prev => ({ ...prev, timesPerInterval: Number(e.target.value) }))}
@@ -561,7 +560,7 @@ export default function TasksClient() {
                                 <option key={n} value={n}>{n}</option>
                               ))}
                             </select>
-                            <span className="text-xs text-gray-600">回</span>
+                            <span className="text-xs text-gray-600">{t('tasks.times')}</span>
                           </div>
                         )
                       })()}
@@ -570,9 +569,10 @@ export default function TasksClient() {
                     {/* 開始日（必須） */}
                     <div>
                       <p className="text-xs font-semibold text-yellow-700 mb-1.5">
-                        開始日時 <span className="text-red-500">*</span>
+                        {t('tasks.startDate')} <span className="text-red-500">*</span>
                       </p>
                       <input type="datetime-local"
+                        lang={lang}
                         value={form.taskStartAt}
                         onChange={e => setForm(prev => ({ ...prev, taskStartAt: e.target.value }))}
                         className={`w-full border rounded-xl px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 ${
@@ -584,9 +584,10 @@ export default function TasksClient() {
                     {/* 終了日（必須） */}
                     <div>
                       <p className="text-xs font-semibold text-yellow-700 mb-1.5">
-                        終了日時 <span className="text-red-500">*</span>
+                        {t('tasks.endDate')} <span className="text-red-500">*</span>
                       </p>
                       <input type="datetime-local"
+                        lang={lang}
                         value={form.taskEndAt}
                         min={form.taskStartAt}
                         onChange={e => setForm(prev => ({ ...prev, taskEndAt: e.target.value }))}
@@ -595,7 +596,7 @@ export default function TasksClient() {
                         }`}
                       />
                       {form.showPremiumDetail && (!form.taskStartAt || !form.taskEndAt) && (
-                        <p className="text-[10px] text-red-500 mt-1">開始日時と終了日時は必須です</p>
+                        <p className="text-[10px] text-red-500 mt-1">{t('tasks.requiredDates')}</p>
                       )}
                     </div>
 
@@ -607,7 +608,7 @@ export default function TasksClient() {
               <div>
                 <button type="button"
                   onClick={() => {
-                    if (!isPremium) { setPremiumFeatureName('通知設定'); setPremiumModalOpen(true); return }
+                    if (!isPremium) { setPremiumFeatureName(t('tasks.notification')); setPremiumModalOpen(true); return }
                     setForm(prev => ({ ...prev, showNotification: !prev.showNotification }))
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs font-semibold transition ${
@@ -619,11 +620,11 @@ export default function TasksClient() {
                   <span className="flex items-center gap-1.5">
                     {!isPremium && <Lock className="w-3 h-3" />}
                     <Bell className="w-3.5 h-3.5" />
-                    通知設定
+                    {t('tasks.notification')}
                     {!isPremium
-                      ? <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">Premium</span>
+                      ? <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">{t('tasks.premium')}</span>
                       : form.notificationOn
-                        ? <span className="text-blue-500">{form.notifEntries.length}件設定中</span>
+                        ? <span className="text-blue-500">{form.notifEntries.length}{t('tasks.notifCount')}</span>
                         : null
                     }
                   </span>
@@ -638,7 +639,7 @@ export default function TasksClient() {
 
                     {/* ON/OFF トグル */}
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-gray-700">通知を有効にする</p>
+                      <p className="text-xs font-semibold text-gray-700">{t('tasks.notifEnable')}</p>
                       <button type="button"
                         onClick={() => setForm(prev => ({
                           ...prev,
@@ -664,11 +665,11 @@ export default function TasksClient() {
                                 <button type="button"
                                   onClick={() => updateNotifEntry(entry.id, { type: 'weekly', day: 1, time: '08:00' } as Partial<NotifEntry>)}
                                   className={`px-2.5 py-1.5 font-semibold transition ${entry.type === 'weekly' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600'}`}
-                                >毎週</button>
+                                >{t('tasks.everyWeek')}</button>
                                 <button type="button"
                                   onClick={() => updateNotifEntry(entry.id, { type: 'once', datetime: '' } as Partial<NotifEntry>)}
                                   className={`px-2.5 py-1.5 font-semibold transition ${entry.type === 'once' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600'}`}
-                                >日時指定</button>
+                                >{t('tasks.datetime')}</button>
                               </div>
                               <div className="flex-1" />
                               <button type="button" onClick={() => removeNotifEntry(entry.id)}
@@ -693,7 +694,7 @@ export default function TasksClient() {
                                   ))}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-500">時刻</span>
+                                  <span className="text-xs text-gray-500">{t('tasks.time')}</span>
                                   <input type="time"
                                     value={(entry as { time: string }).time}
                                     onChange={e => updateNotifEntry(entry.id, { time: e.target.value } as Partial<NotifEntry>)}
@@ -704,8 +705,9 @@ export default function TasksClient() {
                             ) : (
                               /* 日時指定 */
                               <div>
-                                <p className="text-xs text-gray-500 mb-1">年/月/日 時:分</p>
+                                <p className="text-xs text-gray-500 mb-1">{t('tasks.datetimeLabel')}</p>
                                 <input type="datetime-local"
+                                  lang={lang}
                                   value={(entry as { datetime: string }).datetime}
                                   onChange={e => updateNotifEntry(entry.id, { datetime: e.target.value } as Partial<NotifEntry>)}
                                   className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -719,11 +721,11 @@ export default function TasksClient() {
                         <div className="flex gap-2">
                           <button type="button" onClick={() => addNotifEntry('weekly')}
                             className="flex-1 py-2 rounded-xl border border-dashed border-blue-300 text-blue-500 text-xs font-semibold hover:bg-blue-100 transition">
-                            ＋ 毎週
+                            {t('tasks.addWeekly')}
                           </button>
                           <button type="button" onClick={() => addNotifEntry('once')}
                             className="flex-1 py-2 rounded-xl border border-dashed border-blue-300 text-blue-500 text-xs font-semibold hover:bg-blue-100 transition">
-                            ＋ 日時指定
+                            {t('tasks.addDatetime')}
                           </button>
                         </div>
                       </>
@@ -738,8 +740,8 @@ export default function TasksClient() {
                 {saving
                   ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   : editId
-                    ? <><Check className="w-4 h-4" />更新する</>
-                    : <><Plus className="w-4 h-4" />追加する</>
+                    ? <><Check className="w-4 h-4" />{t('tasks.update')}</>
+                    : <><Plus className="w-4 h-4" />{t('tasks.submit')}</>
                 }
               </button>
             </div>
@@ -756,23 +758,52 @@ export default function TasksClient() {
           <div className="absolute rounded-full bg-white/8" style={{ width: 200, height: 200, top: -50, right: -50 }} />
           <div className="absolute rounded-full bg-white/5" style={{ width: 130, height: 130, bottom: -30, left: -30 }} />
           <div className="relative px-7 py-6">
-            <p className="text-red-200 text-xs font-bold uppercase tracking-widest mb-2">マイルストーン</p>
+            <p className="text-red-200 text-xs font-bold uppercase tracking-widest mb-2">{t('tasks.msLabel')}</p>
             <h2 className="text-white font-bold leading-tight mb-4" style={{ fontSize: 'clamp(20px, 6vw, 28px)' }}>
               {milestone.title}
             </h2>
-            <div className="mb-3">
-              <p className="text-red-200 text-xs font-semibold mb-1.5">やる理由</p>
-              <textarea
-                value={reasonText} onChange={e => setReasonText(e.target.value)} onBlur={saveReason}
-                placeholder="やる理由を入力して、目的意識を忘れずに！" rows={2}
-                className="w-full bg-white/15 text-white placeholder-white/40 text-sm rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-white/40"
-                style={{ fontSize: 13 }}
-              />
-              {savingReason && <p className="text-white/40 text-xs mt-1">保存中...</p>}
+
+            {/* ── インライン期限設定 ─────────────────────────────────────── */}
+            <div className="border-t border-white/20 pt-3">
+              {!deadlineEditing ? (
+                <button
+                  onClick={() => setDeadlineEditing(true)}
+                  className="flex items-center gap-2 text-white/70 hover:text-white transition text-xs"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  {milestone.deadline
+                    ? `${t('tasks.deadlineLabel')} ${new Date(milestone.deadline).toLocaleDateString()}`
+                    : t('tasks.deadlineTitle')}
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-white/70 text-xs flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" />{t('tasks.deadlineTitle')}
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={deadline}
+                      onChange={e => setDeadline(e.target.value)}
+                      className="flex-1 bg-white/20 border border-white/30 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/50 [color-scheme:dark]"
+                    />
+                    <button
+                      onClick={() => saveDeadline('')}
+                      className="px-3 py-2 bg-white/20 text-white text-xs rounded-xl whitespace-nowrap hover:bg-white/30 transition"
+                    >
+                      {t('tasks.deleteDeadline')}
+                    </button>
+                    <button
+                      onClick={() => saveDeadline()}
+                      disabled={savingDeadline}
+                      className="px-3 py-2 bg-white text-red-600 text-xs font-semibold rounded-xl disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {savingDeadline ? t('tasks.savingDeadline') : t('tasks.saveDeadline')}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            {milestone.deadline && (
-              <p className="text-white/60 text-xs">期限: {new Date(milestone.deadline).toLocaleDateString('ja-JP')}</p>
-            )}
           </div>
         </div>
 
@@ -798,8 +829,8 @@ export default function TasksClient() {
 
         {tasks.length === 0 && !formOpen && (
           <div className="text-center py-6">
-            <p className="text-gray-400 text-sm">まだタスクがありません</p>
-            <p className="text-gray-300 text-xs mt-1">上の「タスクを追加」から追加してください</p>
+            <p className="text-gray-400 text-sm">{t('tasks.empty')}</p>
+            <p className="text-gray-300 text-xs mt-1">{t('tasks.emptyHint')}</p>
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { isCompletedToday, shouldShowInToday } from '@/lib/taskUtils'
 import { useCrownCount } from '@/lib/useCrownCount'
 import { Crown } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 type GoalWithData = Goal & { milestones: any[] }
 
@@ -48,6 +49,7 @@ function deriveMilestones(g: GoalWithData): Milestone[] {
 }
 
 export default function HomeClient() {
+  const { t } = useI18n()
   const crownCount = useCrownCount()
   const [allGoals, setAllGoals] = useState<GoalWithData[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -62,7 +64,7 @@ export default function HomeClient() {
     async function fetchData() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setLoading(false); return }
 
       const { data: goals } = await supabase
         .from('goals')
@@ -114,13 +116,13 @@ export default function HomeClient() {
       <div className="page-enter min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6 text-center">
         <img src="/logo.svg" alt="REVIVE" className="w-16 h-16 mb-5" />
         <h1 className="text-2xl font-bold text-gray-900 mb-2">REVIVE</h1>
-        <p className="text-gray-500 text-sm mb-8">目標を設定して<br />夢への道を歩み始めましょう</p>
+        <p className="text-gray-500 text-sm mb-8" style={{ whiteSpace: 'pre-line' }}>{t('home.emptyDesc')}</p>
         <Link
           href="/goals/new"
           className="bg-red-600 text-white px-7 py-3.5 rounded-2xl font-bold flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
-          最初の目標を作る
+          {t('home.addGoal')}
         </Link>
       </div>
     )
@@ -180,7 +182,7 @@ export default function HomeClient() {
         )}
 
         <Link href="/goals" className="text-sm font-semibold text-red-600 flex-shrink-0">
-          目標一覧
+          {t('goals.title')}
         </Link>
       </div>
 
@@ -193,7 +195,7 @@ export default function HomeClient() {
           <div className="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-3">
             <div className="flex items-center gap-2">
               <Crown className="w-5 h-5 text-yellow-500" />
-              <span className="text-sm font-bold text-yellow-700">王冠</span>
+              <span className="text-sm font-bold text-yellow-700">{t('home.crown')}</span>
             </div>
             <span className="text-2xl font-black text-yellow-600">{crownCount}</span>
           </div>
@@ -210,7 +212,7 @@ export default function HomeClient() {
           href={`/milestones?goalId=${goal.id}`}
           className="block w-full bg-red-600 text-white text-center py-4 rounded-2xl font-bold text-sm"
         >
-          マイルストーンを管理する →
+          {t('home.manageMilestones')}
         </Link>
       </div>
     </div>

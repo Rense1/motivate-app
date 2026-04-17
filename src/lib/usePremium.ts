@@ -8,13 +8,16 @@ import { usePremiumStore } from './premiumStore'
  * 現在のユーザーの Premium ステータスを返す。
  * null = ロード中, true/false = 結果
  *
- * - コンポーネントのマウント毎に Supabase から再取得する（キャッシュしない）
- * - Zustand ストアで全コンポーネントに即時共有される
+ * - Zustand ストアにキャッシュ済みの場合は Supabase を叩かない
+ * - SettingsClient など任意の場所から setPremium() で更新するとアプリ全体に即時反映される
  */
 export function usePremium(): boolean | null {
-  const { isPremium, setPremium } = usePremiumStore()
+  const { isPremium, loaded, setPremium } = usePremiumStore()
 
   useEffect(() => {
+    // 既にロード済みならフェッチしない（ページ遷移ごとの無駄なネットワーク往復を防ぐ）
+    if (loaded) return
+
     let cancelled = false
 
     async function fetchPremium() {
@@ -45,7 +48,7 @@ export function usePremium(): boolean | null {
 
     fetchPremium()
     return () => { cancelled = true }
-  }, [])  // マウント毎に実行（ページ遷移で常に最新値を取得）
+  }, [loaded, setPremium])
 
   return isPremium
 }

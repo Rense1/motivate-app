@@ -4,6 +4,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Crown } from 'lucide-react'
 import { useAnimationStore } from '@/stores/animationStore'
+import { useI18n } from '@/lib/i18n'
 
 // ── パーティクル型 ────────────────────────────────────────────────────────
 interface Particle {
@@ -143,6 +144,7 @@ function confettiStyle(c: ConfettiPiece): CSSProperties {
 // ── メインコンポーネント ──────────────────────────────────────────────────
 export default function AchievementOverlay() {
   const { queue, shift } = useAnimationStore()
+  const { t } = useI18n()
   const event = queue[0] ?? null
 
   // ── ローカルステート ─────────────────────────────────────────────────
@@ -431,7 +433,7 @@ export default function AchievementOverlay() {
                     flexShrink: 0,
                   }}
                 />
-                王冠獲得！
+                {t('milestone.crownObtained')}
               </span>
             </motion.div>
             {/* サブテキスト */}
@@ -453,7 +455,7 @@ export default function AchievementOverlay() {
                 textShadow: '0 1px 4px rgba(0,0,0,0.3)',
               }}
             >
-              すべての目標を達成しました！
+              {t('milestone.crownSubtext')}
             </motion.div>
           </>
         )}

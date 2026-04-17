@@ -3,9 +3,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Target, Settings } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const { t } = useI18n()
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-gray-200 px-6 py-3 flex justify-around items-center z-40">
@@ -14,7 +16,7 @@ export default function BottomNav() {
         className={`flex flex-col items-center gap-1 ${pathname === '/home' ? 'text-red-600' : 'text-gray-400'}`}
       >
         <Home className="w-6 h-6" />
-        <span className="text-xs">ホーム</span>
+        <span className="text-xs">{t('nav.home')}</span>
       </Link>
 
       <Link
@@ -22,7 +24,7 @@ export default function BottomNav() {
         className={`flex flex-col items-center gap-1 ${pathname.startsWith('/goals') || pathname.startsWith('/milestones') ? 'text-red-600' : 'text-gray-400'}`}
       >
         <Target className="w-6 h-6" />
-        <span className="text-xs">目標</span>
+        <span className="text-xs">{t('nav.goals')}</span>
       </Link>
 
       <Link
@@ -30,7 +32,7 @@ export default function BottomNav() {
         className={`flex flex-col items-center gap-1 ${pathname.startsWith('/settings') ? 'text-red-600' : 'text-gray-400'}`}
       >
         <Settings className="w-6 h-6" />
-        <span className="text-xs">設定</span>
+        <span className="text-xs">{t('nav.settings')}</span>
       </Link>
     </nav>
   )

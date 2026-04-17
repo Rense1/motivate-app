@@ -5,6 +5,10 @@ export interface Profile {
   display_name: string | null
   avatar_url: string | null
   created_at: string
+  birth_year:  number | null
+  birth_month: number | null
+  birth_day:   number | null
+  occupation:  string | null
 }
 
 export interface Goal {
@@ -13,6 +17,7 @@ export interface Goal {
   title: string
   vision_image_url: string | null
   vision_text: string | null
+  deadline: string | null
   created_at: string
   updated_at: string
   milestones?: Milestone[]

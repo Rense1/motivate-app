@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAnimationStore } from '@/stores/animationStore'
 import { useHaptic } from '@/hooks/useHaptic'
 import AchievementOverlay from './AchievementOverlay'
+import { useI18n } from '@/lib/i18n'
 
 // ── Props ──────────────────────────────────────────────────────────────────
 interface MilestoneRoadmapProps {
@@ -22,6 +23,10 @@ interface MilestoneRoadmapProps {
   onMilestoneUpdate: (id: string, updates: Partial<Milestone>) => void
   /** 中央に表示されているカードの visual index が変わったときのコールバック */
   onActiveIndexChange?: (visualIndex: number) => void
+  /** チュートリアル中: 一番下（初回）のマイルストーンへ自動スクロール */
+  tutorialActive?: boolean
+  /** チュートリアルでカードタップ時に呼ぶコールバック */
+  onTutorialCardTap?: () => void
 }
 
 // ── カードのアニメーションバリアント ──────────────────────────────────────
@@ -69,7 +74,7 @@ function RoadDots({ green }: { green: boolean }) {
 }
 
 // ── 達成スタンプ（カード上のアニメーション） ──────────────────────────────
-function AchievementStamp() {
+function AchievementStamp({ text }: { text: string }) {
   return (
     <motion.div
       initial={{ scale: 2.8, opacity: 0, rotate: -18 }}
@@ -96,7 +101,7 @@ function AchievementStamp() {
       >
         <CheckCircle2 style={{ width: 42, height: 42, color: 'white' }} />
         <span style={{ fontSize: 14, fontWeight: 900, color: 'white', letterSpacing: '0.5px' }}>
-          達成！
+          {text}
         </span>
       </div>
     </motion.div>
@@ -111,11 +116,14 @@ export default function MilestoneRoadmap({
   visionImageUrl,
   onMilestoneUpdate,
   onActiveIndexChange,
+  tutorialActive = false,
+  onTutorialCardTap,
 }: MilestoneRoadmapProps) {
   const router = useRouter()
   const supabase = createClient()
   const pushAnimation = useAnimationStore((s) => s.push)
   const haptic = useHaptic()
+  const { t } = useI18n()
 
   // ── スクロール / アクティブ管理 ──────────────────────────────────────
   const [activeIndex, setActiveIndex] = useState(0)
@@ -148,8 +156,6 @@ export default function MilestoneRoadmap({
   /** ゴールカードの王冠アイコン（最終達成アニメーションの起点） */
   const goalCrownIconRef = useRef<HTMLDivElement>(null)
 
-  // ── やる理由の先頭文キャッシュ ───────────────────────────────────────
-  const [firstReasonMap, setFirstReasonMap] = useState<Record<string, string>>({})
 
   const total = milestones.length
 
@@ -177,29 +183,16 @@ export default function MilestoneRoadmap({
    */
   const totalVisual = total + 1
 
-  // ── やる理由を一括取得 ────────────────────────────────────────────────
-  useEffect(() => {
-    if (total === 0) return
-    const ids = milestones.map((m) => m.id)
-    supabase
-      .from('milestone_reasons')
-      .select('milestone_id, reason, order_index')
-      .in('milestone_id', ids)
-      .order('order_index')
-      .then(({ data }) => {
-        if (!data) return
-        const map: Record<string, string> = {}
-        for (const row of data) {
-          if (!(row.milestone_id in map)) map[row.milestone_id] = row.reason
-        }
-        setFirstReasonMap(map)
-      })
-  }, [milestones.map((m) => m.id).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── マウント時に現在のマイルストーンへスクロール ─────────────────────
   useEffect(() => {
-    const firstNonAchievedOrig = milestones.findIndex((m) => !m.is_achieved)
-    const targetVI = firstNonAchievedOrig === -1 ? 0 : total - firstNonAchievedOrig
+    // チュートリアル中は一番下（最初）のマイルストーンへスクロール
+    const targetVI = tutorialActive
+      ? total  // vi=total = order_index=0（最初のマイルストーン）
+      : (() => {
+          const firstNonAchievedOrig = milestones.findIndex((m) => !m.is_achieved)
+          return firstNonAchievedOrig === -1 ? 0 : total - firstNonAchievedOrig
+        })()
 
     setActiveIndex(targetVI)
     onActiveIndexChange?.(targetVI)
@@ -208,9 +201,9 @@ export default function MilestoneRoadmap({
       const card = cardRefs.current[targetVI]
       const c = containerRef.current
       if (card && c) {
-        c.scrollTop = card.offsetTop + card.offsetHeight / 2 - c.clientHeight / 2
+        c.scrollTo({ top: card.offsetTop + card.offsetHeight / 2 - c.clientHeight / 2, behavior: tutorialActive ? 'smooth' : 'auto' })
       }
-    }, 60)
+    }, tutorialActive ? 400 : 60)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── スクロール中のアクティブカード検出 ──────────────────────────────
@@ -253,6 +246,7 @@ export default function MilestoneRoadmap({
   // ── カードタップ → タスク画面へ遷移 ─────────────────────────────────
   function handleCardTap(milestone: Milestone, locked: boolean) {
     if (locked) return
+    if (tutorialActive) onTutorialCardTap?.()
     router.push(`/tasks?goalId=${goalId}&milestoneId=${milestone.id}`)
   }
 
@@ -362,7 +356,7 @@ export default function MilestoneRoadmap({
   if (total === 0) {
     return (
       <div className="flex-1 flex items-center justify-center pb-20">
-        <p className="text-gray-400 text-sm">マイルストーンを追加してください</p>
+        <p className="text-gray-400 text-sm">{t('milestone.addEmpty')}</p>
       </div>
     )
   }
@@ -407,7 +401,7 @@ export default function MilestoneRoadmap({
           >
             <Crown className="w-5 h-5" style={{ color: hasCrown ? '#eab308' : '#9ca3af' }} />
             {hasCrown && (
-              <span className="text-xs font-bold text-yellow-600 whitespace-nowrap">王冠獲得！</span>
+              <span className="text-xs font-bold text-yellow-600 whitespace-nowrap">{t('milestone.crownObtained')}</span>
             )}
           </motion.div>
         </div>
@@ -469,7 +463,7 @@ export default function MilestoneRoadmap({
 
                   <div className="relative flex items-start justify-between">
                     <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)' }}>
-                      最終目標
+                      {t('milestone.finalGoal')}
                     </span>
                     {/* 王冠アイコン: ゴール達成アニメーションの起点として ref を保持 */}
                     <motion.div
@@ -496,7 +490,7 @@ export default function MilestoneRoadmap({
                         className="text-sm font-bold mt-2"
                         style={{ color: '#86efac' }}
                       >
-                        🎉 すべてのマイルストーンを達成しました！
+                        {t('milestone.allAchieved')}
                       </motion.p>
                     )}
                   </div>
@@ -504,8 +498,8 @@ export default function MilestoneRoadmap({
                   <div className="relative">
                     <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
                       {hasCrown
-                        ? 'あなたは目標を達成しました'
-                        : 'すべてのマイルストーンを達成してここに到達しよう'}
+                        ? t('milestone.allMsAchieved')
+                        : t('milestone.reachAllMs')}
                     </p>
                   </div>
                 </div>
@@ -541,10 +535,10 @@ export default function MilestoneRoadmap({
                   }}
                 >
                   {goalCardTriggered
-                    ? '👑 目標達成！おめでとう！'
+                    ? t('milestone.goalAchieved')
                     : hasCrown
-                    ? '🎯 目標を達成した！'
-                    : `🔒 残り ${maxKeys - keys} 個のマイルストーンを達成しよう`}
+                    ? t('milestone.achieveGoal')
+                    : `🔒 ${t('milestone.remaining')} ${maxKeys - keys} ${t('milestone.remainingMs')}`}
                 </motion.button>
               </motion.div>
             </div>
@@ -578,8 +572,6 @@ export default function MilestoneRoadmap({
 
             const bgColor = milestone.is_achieved ? '#15803d' : locked ? '#1f2937' : RANK_BG[rank]
 
-            const reason = firstReasonMap[milestone.id]
-
             const hasNextCard = visualIndex < total
             const nextMilestone = hasNextCard ? milestones[originalIndex - 1] : null
             const lineGreen = nextMilestone
@@ -598,7 +590,10 @@ export default function MilestoneRoadmap({
                 <div
                   ref={(el) => { cardRefs.current[visualIndex] = el }}
                   className="px-5"
-                  style={{ scrollSnapAlign: 'center' }}
+                  style={{
+                    scrollSnapAlign: 'center',
+                    ...(tutorialActive && originalIndex === 0 ? { position: 'relative', zIndex: 55 } : {}),
+                  }}
                 >
                   {/* Framer Motion カードラッパー */}
                   <motion.div
@@ -665,7 +660,7 @@ export default function MilestoneRoadmap({
 
                       {/* ── 達成スタンプ（新着達成時のみ） ─────────── */}
                       <AnimatePresence>
-                        {isNewlyAchieved && <AchievementStamp key={`stamp-${milestone.id}`} />}
+                        {isNewlyAchieved && <AchievementStamp key={`stamp-${milestone.id}`} text={t('milestone.achievedStamp')} />}
                       </AnimatePresence>
 
                       {/* ヘッダー行 */}
@@ -674,7 +669,7 @@ export default function MilestoneRoadmap({
                           className="text-xs font-bold uppercase tracking-widest"
                           style={{ color: locked ? '#6b7280' : 'rgba(255,255,255,0.65)' }}
                         >
-                          {meta.label || `ステップ ${originalIndex + 1}/${total}`}
+                          {meta.label || `${t('milestone.step')} ${originalIndex + 1}/${total}`}
                         </span>
                         <div className="flex flex-col items-end gap-1">
                           {!locked && (() => {
@@ -698,8 +693,8 @@ export default function MilestoneRoadmap({
                         </div>
                       </div>
 
-                      {/* タイトル + やる理由 */}
-                      <div className="relative flex-1 flex flex-col justify-center py-4 gap-2">
+                      {/* タイトル */}
+                      <div className="relative flex-1 flex flex-col justify-center py-4">
                         <h2
                           className="font-bold leading-tight"
                           style={{
@@ -709,20 +704,6 @@ export default function MilestoneRoadmap({
                         >
                           {milestone.title}
                         </h2>
-                        {!locked && (
-                          <p
-                            style={{
-                              fontSize: 12,
-                              color: reason
-                                ? 'rgba(255,255,255,0.72)'
-                                : 'rgba(255,255,255,0.38)',
-                              fontStyle: reason ? 'normal' : 'italic',
-                              lineHeight: 1.4,
-                            }}
-                          >
-                            {reason || 'タスク管理画面でやる理由を設定'}
-                          </p>
-                        )}
                       </div>
 
                       {/* フッターヒント */}
@@ -732,8 +713,8 @@ export default function MilestoneRoadmap({
                           style={{ color: locked ? '#4b5563' : 'rgba(255,255,255,0.4)' }}
                         >
                           {locked
-                            ? 'ひとつ前のマイルストーンを達成すると解放されます'
-                            : 'タップでタスクを管理'}
+                            ? t('milestone.locked')
+                            : t('milestone.tapForTasks')}
                         </p>
                       </div>
 
@@ -818,7 +799,7 @@ export default function MilestoneRoadmap({
                         }`}
                         style={{ minHeight: 52 }}
                       >
-                        {milestone.is_achieved ? '✓ 達成済み' : '🏆 達成する'}
+                        {milestone.is_achieved ? t('milestone.achievedBtn') : t('milestone.achieve')}
                       </motion.button>
                     )}
                   </motion.div>
