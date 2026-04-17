@@ -75,6 +75,7 @@ export const ja = {
     create: '目標を作成する',
     creating: '作成中...',
     sessionError: 'セッションエラーが発生しました。ページを再読込してください。',
+    createError: '目標の作成に失敗しました。もう一度お試しください。',
     deleteConfirm: 'この目標を削除しますか？',
     moreGoals: '3つ目以降の目標追加',
     deadline: '期限',

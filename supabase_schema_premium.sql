@@ -38,6 +38,9 @@ CREATE TABLE profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE profiles DROP CONSTRAINT profiles_id_fkey;
+ALTER TABLE profiles ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
+
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can read their own profile" ON profiles

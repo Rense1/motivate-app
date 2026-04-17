@@ -9,6 +9,8 @@ CREATE TABLE goals (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE goals DROP CONSTRAINT goals_user_id_fkey;
+
 -- Milestones table (ordered checkpoints toward a goal)
 CREATE TABLE milestones (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

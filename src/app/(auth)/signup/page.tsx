@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useI18n } from '@/lib/i18n'
+import { isAnonymousUser } from '@/lib/userUtils'
 
 // 月ごとの日数（うるう年は別途考慮）
 function daysInMonth(year: number, month: number): number {
@@ -50,15 +51,12 @@ export default function SignupPage() {
 
     setLoading(true)
 
-    // 現在匿名ユーザーかどうか確認
     const { data: { user: currentUser } } = await supabase.auth.getUser()
-    const isAnonymous = currentUser?.is_anonymous === true ||
-      (currentUser?.app_metadata as Record<string, unknown>)?.['provider'] === 'anonymous'
 
     let userId: string | null = null
     let signupError: string | null = null
 
-    if (isAnonymous && currentUser) {
+    if (currentUser && isAnonymousUser(currentUser)) {
       // 匿名アカウントをメール/パスワードアカウントにアップグレード
       const { data, error } = await supabase.auth.updateUser(
         { email, password },

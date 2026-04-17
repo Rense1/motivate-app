@@ -77,6 +77,7 @@ export const en: Translations = {
     create: 'Create goal',
     creating: 'Creating...',
     sessionError: 'Session error. Please reload the page.',
+    createError: 'Failed to create goal. Please try again.',
     deleteConfirm: 'Delete this goal?',
     moreGoals: 'Adding a 3rd goal or more',
     deadline: 'Deadline',

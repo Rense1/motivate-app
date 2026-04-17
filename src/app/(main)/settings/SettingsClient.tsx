@@ -10,6 +10,7 @@ import PremiumModal from '@/components/ui/PremiumModal'
 import { usePremiumStore } from '@/lib/premiumStore'
 import { useI18n } from '@/lib/i18n'
 import type { Lang } from '@/lib/i18n'
+import { isAnonymousUser } from '@/lib/userUtils'
 
 export default function SettingsClient() {
   const { t, lang, setLang } = useI18n()
@@ -33,10 +34,7 @@ export default function SettingsClient() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      // is_anonymous が未設定の場合でも app_metadata.provider で判定する
-      const isAnon = user.is_anonymous === true ||
-        (user.app_metadata as Record<string, unknown>)?.['provider'] === 'anonymous'
-      setIsAnonymous(isAnon)
+      setIsAnonymous(isAnonymousUser(user))
       setEmail(user.email || '')
 
       const { data: prof } = await supabase
