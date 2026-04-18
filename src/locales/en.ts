@@ -80,6 +80,7 @@ export const en: Translations = {
     createError: 'Failed to create goal. Please try again.',
     deleteConfirm: 'Delete this goal?',
     moreGoals: 'Adding a 3rd goal or more',
+    editGoalTitle: 'Edit goal',
     deadline: 'Deadline',
     deadlineToday: 'Due today',
     daysLeft: ' days left',
@@ -116,6 +117,9 @@ export const en: Translations = {
     crownSubtext: 'You achieved all your goals!',
     addEmpty: 'Add a milestone to get started',
     step: 'Step',
+    editTitle: 'Edit milestone',
+    editButton: 'Save',
+    editing: 'Saving...',
   },
   tasks: {
     management: 'Task Management',

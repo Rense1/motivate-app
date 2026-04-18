@@ -78,6 +78,7 @@ export const ja = {
     createError: '目標の作成に失敗しました。もう一度お試しください。',
     deleteConfirm: 'この目標を削除しますか？',
     moreGoals: '3つ目以降の目標追加',
+    editGoalTitle: '目標を編集',
     deadline: '期限',
     deadlineToday: '今日が期限',
     daysLeft: '日後',
@@ -114,6 +115,9 @@ export const ja = {
     crownSubtext: 'すべての目標を達成しました！',
     addEmpty: 'マイルストーンを追加してください',
     step: 'ステップ',
+    editTitle: 'マイルストーンを編集',
+    editButton: '保存する',
+    editing: '保存中...',
   },
   tasks: {
     management: 'タスク管理',

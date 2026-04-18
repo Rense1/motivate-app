@@ -7,7 +7,7 @@ import TaskCard from '@/components/task/TaskCard'
 import PremiumModal from '@/components/ui/PremiumModal'
 import {
   ChevronLeft, Plus, Calendar, Lock, ChevronDown, ChevronUp,
-  Bell, X, Check, Trash2,
+  Bell, X, Check, Trash2, Pencil,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -97,6 +97,10 @@ export default function TasksClient() {
   const [deadline, setDeadline]             = useState('')
   const [savingDeadline, setSavingDeadline] = useState(false)
   const [deadlineEditing, setDeadlineEditing] = useState(false)
+
+  const [editingMsTitle, setEditingMsTitle] = useState(false)
+  const [msTitleInput, setMsTitleInput]     = useState('')
+  const [savingMsTitle, setSavingMsTitle]   = useState(false)
 
   const [premiumModalOpen, setPremiumModalOpen]     = useState(false)
   const [premiumFeatureName, setPremiumFeatureName] = useState('')
@@ -331,6 +335,16 @@ export default function TasksClient() {
     setTasks(next)
     syncWidgetTasks(next.map(t => t.title))
     if (editId === id) cancelEdit()
+  }
+
+  // ── マイルストーンタイトル保存 ────────────────────────────────────────────
+  async function saveMilestoneTitle() {
+    if (!milestone || !msTitleInput.trim()) return
+    setSavingMsTitle(true)
+    await supabase.from('milestones').update({ title: msTitleInput.trim() }).eq('id', milestoneId)
+    setMilestone({ ...milestone, title: msTitleInput.trim() })
+    setEditingMsTitle(false)
+    setSavingMsTitle(false)
   }
 
   // ── 期限保存 ──────────────────────────────────────────────────────────────
@@ -759,9 +773,33 @@ export default function TasksClient() {
           <div className="absolute rounded-full bg-white/5" style={{ width: 130, height: 130, bottom: -30, left: -30 }} />
           <div className="relative px-7 py-6">
             <p className="text-red-200 text-xs font-bold uppercase tracking-widest mb-2">{t('tasks.msLabel')}</p>
-            <h2 className="text-white font-bold leading-tight mb-4" style={{ fontSize: 'clamp(20px, 6vw, 28px)' }}>
-              {milestone.title}
-            </h2>
+            {editingMsTitle ? (
+              <div className="flex items-center gap-2 mb-4">
+                <input
+                  autoFocus
+                  value={msTitleInput}
+                  onChange={e => setMsTitleInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveMilestoneTitle(); if (e.key === 'Escape') setEditingMsTitle(false) }}
+                  className="flex-1 bg-white/20 border border-white/40 rounded-xl px-3 py-2 text-white font-bold text-base focus:outline-none focus:ring-2 focus:ring-white/50 placeholder-white/50"
+                />
+                <button onClick={saveMilestoneTitle} disabled={savingMsTitle} className="p-1.5 bg-white/20 rounded-lg text-white hover:bg-white/30 transition flex-shrink-0">
+                  <Check className="w-4 h-4" />
+                </button>
+                <button onClick={() => setEditingMsTitle(false)} className="p-1.5 bg-white/20 rounded-lg text-white/70 hover:bg-white/30 transition flex-shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setMsTitleInput(milestone.title); setEditingMsTitle(true) }}
+                className="flex items-start gap-2 group mb-4 text-left"
+              >
+                <h2 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(20px, 6vw, 28px)' }}>
+                  {milestone.title}
+                </h2>
+                <Pencil className="w-4 h-4 text-white/30 group-hover:text-white/60 transition mt-1 flex-shrink-0" />
+              </button>
+            )}
 
             {/* ── インライン期限設定 ─────────────────────────────────────── */}
             <div className="border-t border-white/20 pt-3">

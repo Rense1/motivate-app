@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Milestone } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
-import { Lock, LockOpen, Crown, CheckCircle2, Key } from 'lucide-react'
+import { Lock, LockOpen, Crown, CheckCircle2, Key, Pencil } from 'lucide-react'
 import { deadlineBadge } from '@/lib/taskUtils'
 import { getMilestoneRank, isMilestoneLocked, RANK_META, RANK_BG } from '@/lib/progressUtils'
 import { useRouter } from 'next/navigation'
@@ -21,6 +21,7 @@ interface MilestoneRoadmapProps {
   goalTitle: string
   visionImageUrl?: string | null
   onMilestoneUpdate: (id: string, updates: Partial<Milestone>) => void
+  onEditMilestone?: (id: string, title: string) => void
   /** 中央に表示されているカードの visual index が変わったときのコールバック */
   onActiveIndexChange?: (visualIndex: number) => void
   /** チュートリアル中: 一番下（初回）のマイルストーンへ自動スクロール */
@@ -115,6 +116,7 @@ export default function MilestoneRoadmap({
   goalTitle,
   visionImageUrl,
   onMilestoneUpdate,
+  onEditMilestone,
   onActiveIndexChange,
   tutorialActive = false,
   onTutorialCardTap,
@@ -704,6 +706,17 @@ export default function MilestoneRoadmap({
                         >
                           {milestone.title}
                         </h2>
+                        {!locked && onEditMilestone && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onEditMilestone(milestone.id, milestone.title)
+                            }}
+                            className="mt-2 self-start flex items-center gap-1 text-white/50 hover:text-white/80 transition text-xs"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
 
                       {/* フッターヒント */}

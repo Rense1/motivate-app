@@ -37,16 +37,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       async (event, session) => {
         if (event === 'TOKEN_REFRESHED') return
         if (event === 'SIGNED_OUT' && !session) {
-          // settings の signOut() は /login にリダイレクトするのでここには届かない
-          // ただしトークン期限切れで自動サインアウトした場合は再作成する
+          // 意図的なログアウト（settings の signOut()）はフラグで識別してスキップ
+          if (sessionStorage.getItem('manual_signout')) {
+            sessionStorage.removeItem('manual_signout')
+            return
+          }
+          // トークン期限切れによる自動サインアウト時のみ匿名セッションを再作成
           try {
             const { data } = await supabase.auth.signInAnonymously()
-
-            // 🔥 追加：再作成時も profiles 行を保証
             if (data?.user) {
               await supabase.from('profiles').upsert({ id: data.user.id })
             }
-
           } catch (e) {
             console.error('[Anonymous Sign-in] re-create failed:', e)
           }

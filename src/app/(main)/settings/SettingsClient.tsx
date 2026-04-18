@@ -76,8 +76,10 @@ export default function SettingsClient() {
   }
 
   async function signOut() {
+    sessionStorage.setItem('manual_signout', '1')
     await supabase.auth.signOut()
     router.push('/login')
+    router.refresh()
   }
 
   function handleLangChange(l: Lang) {
