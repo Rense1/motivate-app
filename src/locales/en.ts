@@ -43,6 +43,7 @@ export const en: Translations = {
     selectOccupation: 'Select occupation',
     passwordMin: 'Password must be at least 6 characters',
     passwordMismatch: 'Passwords do not match',
+    continueWithoutLogin: 'Continue to Settings without logging in',
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     occupations: [
       { value: 'student_elementary', label: 'Elementary school student' },
@@ -191,6 +192,12 @@ export const en: Translations = {
     guestAccount: 'Guest (not registered)',
     guestNote: 'Your data may be lost if you uninstall or clear cache',
     createAccount: 'Create account to save your data',
+    deleteAccount: 'Delete account',
+    deleteAccountConfirmTitle: 'Delete Account',
+    deleteAccountConfirmMsg: 'Deleting your account will permanently remove all your goals, tasks, and data. This action cannot be undone. Are you sure?',
+    deleteAccountConfirm: 'Delete',
+    deleteAccountCancel: 'Cancel',
+    deleting: 'Deleting...',
   },
   tutorial: {
     tapForTasks: 'Tap to manage your tasks!',

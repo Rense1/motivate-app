@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile } from '@/lib/types'
-import { Camera, Check, Gem, LogOut, X, Crown, Globe, UserPlus } from 'lucide-react'
+import { Camera, Check, Gem, LogOut, X, Crown, Globe, UserPlus, Trash2 } from 'lucide-react'
+import Modal from '@/components/ui/Modal'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PremiumModal from '@/components/ui/PremiumModal'
@@ -27,6 +28,8 @@ export default function SettingsClient() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [loading, setLoading]             = useState(true)
   const [premiumModalOpen, setPremiumModalOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -77,6 +80,19 @@ export default function SettingsClient() {
 
   async function signOut() {
     sessionStorage.setItem('manual_signout', '1')
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  async function deleteAccount() {
+    setDeleting(true)
+    const res = await fetch('/api/delete-account', { method: 'DELETE' })
+    if (!res.ok) {
+      setDeleting(false)
+      setDeleteConfirmOpen(false)
+      return
+    }
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
@@ -232,9 +248,44 @@ export default function SettingsClient() {
             </button>
           </div>
         )}
+
+        {/* アカウント削除（匿名以外のみ） */}
+        {!isAnonymous && (
+          <div className="bg-white rounded-2xl overflow-hidden">
+            <button onClick={() => setDeleteConfirmOpen(true)} className="w-full px-4 py-4 flex items-center gap-3 text-gray-400 hover:text-red-500 transition">
+              <Trash2 className="w-5 h-5" />
+              <span className="text-sm font-medium">{t('settings.deleteAccount')}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <PremiumModal isOpen={premiumModalOpen} onClose={() => setPremiumModalOpen(false)} />
+
+      {/* アカウント削除確認モーダル */}
+      <Modal
+        isOpen={deleteConfirmOpen}
+        onClose={() => !deleting && setDeleteConfirmOpen(false)}
+        title={t('settings.deleteAccountConfirmTitle')}
+      >
+        <p className="text-sm text-gray-600 mb-6">{t('settings.deleteAccountConfirmMsg')}</p>
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={deleteAccount}
+            disabled={deleting}
+            className="w-full bg-red-600 text-white py-3 rounded-xl font-semibold hover:bg-red-700 transition disabled:opacity-50"
+          >
+            {deleting ? t('settings.deleting') : t('settings.deleteAccountConfirm')}
+          </button>
+          <button
+            onClick={() => setDeleteConfirmOpen(false)}
+            disabled={deleting}
+            className="w-full bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-200 transition disabled:opacity-50"
+          >
+            {t('settings.deleteAccountCancel')}
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }

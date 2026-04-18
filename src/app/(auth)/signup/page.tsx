@@ -250,6 +250,19 @@ export default function SignupPage() {
             {t('auth.loginLink')}
           </Link>
         </p>
+
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={() => {
+              sessionStorage.removeItem('manual_signout')
+              router.push('/settings')
+            }}
+            className="w-full text-sm text-gray-400 hover:text-gray-600 transition py-2"
+          >
+            {t('auth.continueWithoutLogin')}
+          </button>
+        </div>
       </div>
     </div>
   )

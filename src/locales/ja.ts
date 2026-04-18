@@ -41,6 +41,7 @@ export const ja = {
     selectOccupation: '職業を選択',
     passwordMin: 'パスワードは6文字以上で設定してください',
     passwordMismatch: 'パスワードが一致しません',
+    continueWithoutLogin: 'ログインせずに設定画面へ戻る',
     months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
     occupations: [
       { value: 'student_elementary', label: '小学生' },
@@ -189,6 +190,12 @@ export const ja = {
     guestAccount: 'ゲストユーザー（未登録）',
     guestNote: 'アプリ削除やキャッシュ消去でデータが消える場合があります',
     createAccount: 'アカウントを作成してデータを保存',
+    deleteAccount: 'アカウントを削除',
+    deleteAccountConfirmTitle: 'アカウントの削除',
+    deleteAccountConfirmMsg: 'アカウントを削除すると、すべての目標・タスク・データが完全に削除されます。この操作は取り消せません。本当に削除しますか？',
+    deleteAccountConfirm: '削除する',
+    deleteAccountCancel: 'キャンセル',
+    deleting: '削除中...',
   },
   tutorial: {
     tapForTasks: 'タップでタスクを管理しよう！',
