@@ -30,6 +30,7 @@ export default function SettingsClient() {
   const [premiumModalOpen, setPremiumModalOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -87,13 +88,36 @@ export default function SettingsClient() {
 
   async function deleteAccount() {
     setDeleting(true)
-    const res = await fetch('/api/delete-account', { method: 'DELETE' })
-    if (!res.ok) {
+    setDeleteError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) {
+        setDeleteError('セッションが見つかりません。再度ログインしてください。')
+        setDeleting(false)
+        return
+      }
+      const res = await fetch('/api/delete-account', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setDeleteError(body.error || 'エラーが発生しました')
+        setDeleting(false)
+        return
+      }
+    } catch {
+      setDeleteError('通信エラーが発生しました')
       setDeleting(false)
-      setDeleteConfirmOpen(false)
       return
     }
-    await supabase.auth.signOut()
+    sessionStorage.setItem('manual_signout', '1')
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // アカウント削除後はセッションが無効なので無視
+    }
     router.push('/login')
     router.refresh()
   }
@@ -252,7 +276,7 @@ export default function SettingsClient() {
         {/* アカウント削除（匿名以外のみ） */}
         {!isAnonymous && (
           <div className="bg-white rounded-2xl overflow-hidden">
-            <button onClick={() => setDeleteConfirmOpen(true)} className="w-full px-4 py-4 flex items-center gap-3 text-gray-400 hover:text-red-500 transition">
+            <button onClick={() => { setDeleteError(''); setDeleteConfirmOpen(true) }} className="w-full px-4 py-4 flex items-center gap-3 text-gray-400 hover:text-red-500 transition">
               <Trash2 className="w-5 h-5" />
               <span className="text-sm font-medium">{t('settings.deleteAccount')}</span>
             </button>
@@ -269,6 +293,7 @@ export default function SettingsClient() {
         title={t('settings.deleteAccountConfirmTitle')}
       >
         <p className="text-sm text-gray-600 mb-6">{t('settings.deleteAccountConfirmMsg')}</p>
+        {deleteError && <p className="text-red-500 text-sm text-center mb-4">{deleteError}</p>}
         <div className="flex flex-col gap-3">
           <button
             onClick={deleteAccount}
