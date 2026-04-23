@@ -62,20 +62,20 @@ supabase/.config/
 supabase/functions/.netlify/
 
 # ============================
-# Public assets (optional cleanup)
-# ============================
-public/raw/
-public/tmp/
-public/screenshots/
-public/unused/
-
-# ============================
 # Project assets not for GitHub
 # ============================
 assets/
 docs/
 icons/
 ios-source/
+
+# ============================
+# Public assets (optional cleanup)
+# ============================
+public/raw/
+public/tmp/
+public/screenshots/
+public/unused/
 
 # ============================
 # Environment variables
