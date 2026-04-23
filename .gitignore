@@ -61,9 +61,21 @@ supabase/.temp/
 supabase/.config/
 supabase/functions/.netlify/
 
-# Ignore all schema fragments except the final schema.sql
-supabase_schema_*.sql
-!supabase/schema.sql
+# ============================
+# Public assets (optional cleanup)
+# ============================
+public/raw/
+public/tmp/
+public/screenshots/
+public/unused/
+
+# ============================
+# Project assets not for GitHub
+# ============================
+assets/
+docs/
+icons/
+ios-source/
 
 # ============================
 # Environment variables
