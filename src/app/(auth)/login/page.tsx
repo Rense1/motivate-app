@@ -8,11 +8,11 @@ import { useI18n } from '@/lib/i18n'
 
 export default function LoginPage() {
   const { t } = useI18n()
-  const [email, setEmail]     = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError]     = useState('')
-  const [loading, setLoading] = useState(false)
-  const router  = useRouter()
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const router   = useRouter()
   const supabase = createClient()
 
   async function handleLogin(e: React.FormEvent) {
@@ -35,7 +35,7 @@ export default function LoginPage() {
 
         {/* ロゴ */}
         <div className="flex flex-col items-center mb-6">
-          <img src="/logo.svg" alt="REVIVE" className="w-20 h-20 mb-3" />
+          <img src="/app-icon.png" alt="REVIVE" className="w-20 h-20 mb-3 rounded-2xl" />
           <span className="text-xs font-black tracking-widest text-red-600 uppercase">REVIVE</span>
         </div>
 

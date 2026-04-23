@@ -10,7 +10,9 @@
     "test:watch": "vitest",
     "lint": "eslint",
     "cap:sync": "next build && npx cap sync",
-    "cap:android": "npx cap open android"
+    "cap:android": "npx cap open android",
+    "cap:ios": "npx cap open ios",
+    "cap:icons": "node -e \"const { execSync } = require('child_process'); execSync('npx capacitor-assets generate --iconBackgroundColor \\\"rgb(249,115,22)\\\" --splashBackgroundColor \\\"rgb(249,115,22)\\\"', { stdio: 'inherit' });\""
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",
@@ -18,7 +20,9 @@
     "@capacitor/browser": "^8.0.3",
     "@capacitor/cli": "^8.3.0",
     "@capacitor/core": "^8.3.0",
+    "@capacitor/ios": "^8.3.0",
     "@capacitor/local-notifications": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.1",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
     "framer-motion": "^12.38.0",
@@ -29,6 +33,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

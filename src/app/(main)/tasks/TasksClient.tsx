@@ -85,8 +85,9 @@ export default function TasksClient() {
   type TutStep = 'add_btn' | 'input' | 'frequency' | null
   const [tutStep, setTutStep] = useState<TutStep>(null)
 
-  const [milestone, setMilestone] = useState<Milestone | null>(null)
-  const [tasks, setTasks]         = useState<Task[]>([])
+  const [milestone, setMilestone]   = useState<Milestone | null>(null)
+  const [goalTitle, setGoalTitle]   = useState('')
+  const [tasks, setTasks]           = useState<Task[]>([])
   const [loading, setLoading]     = useState(true)
 
   const [formOpen, setFormOpen]   = useState(false)
@@ -112,26 +113,41 @@ export default function TasksClient() {
     { value: 'none'   as TaskFrequency, label: t('tasks.once')   },
   ]
 
+  // isPremium が確定したらウィジェットに同期（null のまま送らないようにする）
+  useEffect(() => {
+    if (isPremium !== null) syncWidgetPremium(isPremium)
+  }, [isPremium])
+
   // ── useEffect（hooks は early return より前に置く） ─────────────────────
   useEffect(() => {
     if (!milestoneId || !goalId) return
     createNotificationChannel()
 
     async function fetchData() {
-      const { data: ms } = await supabase
-        .from('milestones').select('*').eq('id', milestoneId).single()
+      const [{ data: ms }, { data: goal }] = await Promise.all([
+        supabase.from('milestones').select('*').eq('id', milestoneId).single(),
+        supabase.from('goals').select('title').eq('id', goalId).single(),
+      ])
 
       if (!ms) { router.replace(`/milestones?goalId=${goalId}`); return }
 
       const { data: taskRows } = await supabase
         .from('tasks').select('*').eq('milestone_id', milestoneId).order('order_index')
 
+      const gTitle = goal?.title ?? ''
       setMilestone(ms)
+      setGoalTitle(gTitle)
       setDeadline(ms.deadline || '')
       setTasks(taskRows || [])
-      syncWidgetTasks((taskRows ?? []).map(t => t.title))
-      syncWidgetPremium(isPremium ?? false)
+      syncWidgetTasks((taskRows ?? []).map(t => t.title), gTitle, ms.title)
       setLoading(false)
+
+      // 再起動後などに失われた通知を再スケジュール
+      for (const task of taskRows ?? []) {
+        if (task.notification_enabled && task.notification_times) {
+          scheduleStructuredNotifications(task.id, task.title, task.notification_times as NotifEntry[])
+        }
+      }
 
       // チュートリアル: タスク追加ボタンをハイライト
       if (isTaskPending()) setTutStep('add_btn')
@@ -200,10 +216,15 @@ export default function TasksClient() {
 
     const freq = effectiveFrequency()
 
-    // 最小ペイロード（base schema のカラムのみ）
-    const basePayload: Record<string, unknown> = {
+    // コアペイロード（必ず存在するカラムのみ）
+    const corePayload: Record<string, unknown> = {
       title: form.title.trim(),
       is_daily: freq === 'daily',
+    }
+    // 通知系カラム（未実行 SQL があればフォールバックで除外）
+    const notifPayload: Record<string, unknown> = {
+      notification_enabled: form.notificationOn,
+      notification_times: form.notifEntries.length > 0 ? form.notifEntries : null,
     }
     // Premium 系カラム（未実行 SQL があればフォールバックで除外）
     const premiumPayload: Record<string, unknown> = {
@@ -213,6 +234,7 @@ export default function TasksClient() {
       task_start_at:  form.showPremiumDetail && form.taskStartAt ? new Date(form.taskStartAt).toISOString() : null,
       task_end_at:    form.showPremiumDetail && form.taskEndAt   ? new Date(form.taskEndAt).toISOString()   : null,
     }
+    const basePayload = { ...corePayload, ...notifPayload }
     const fullPayload = { ...basePayload, ...premiumPayload }
 
     // スキーマキャッシュエラー判定
@@ -221,6 +243,8 @@ export default function TasksClient() {
       msg.includes('interval_value') || msg.includes('interval_unit') ||
       msg.includes('monthly_count') || msg.includes('period_done_count') ||
       msg.includes('period_start')
+    const isNotifColErr = (msg: string) =>
+      msg.includes('notification_enabled') || msg.includes('notification_times')
     const isFreqColErr = (msg: string) => msg.includes('frequency')
 
     let useFrequencyCol = true
@@ -232,7 +256,7 @@ export default function TasksClient() {
         .update({ ...fullPayload, frequency: freq })
         .eq('id', editId).select().single()
 
-      // 試行2: 新カラム未作成 → 新カラムなし + frequency
+      // 試行2: Premium カラム未作成 → Premium なし + frequency
       if (error && isPremiumColErr(error.message)) {
         ;({ data, error } = await supabase
           .from('tasks')
@@ -240,12 +264,20 @@ export default function TasksClient() {
           .eq('id', editId).select().single())
       }
 
-      // 試行3: frequency カラム未作成 → frequency なし
+      // 試行3: 通知カラム未作成 → 通知なし + frequency
+      if (error && isNotifColErr(error.message)) {
+        ;({ data, error } = await supabase
+          .from('tasks')
+          .update({ ...corePayload, frequency: freq })
+          .eq('id', editId).select().single())
+      }
+
+      // 試行4: frequency カラム未作成 → frequency なし
       if (error && isFreqColErr(error.message)) {
         useFrequencyCol = false
         ;({ data, error } = await supabase
           .from('tasks')
-          .update(basePayload)
+          .update(corePayload)
           .eq('id', editId).select().single())
       }
 
@@ -259,7 +291,7 @@ export default function TasksClient() {
             : null,
         }
         setTasks(prev => prev.map(t => t.id === editId ? updated : t))
-        syncWidgetTasks(tasks.map(t => t.id === editId ? updated.title : t.title))
+        syncWidgetTasks(tasks.map(t => t.id === editId ? updated.title : t.title), goalTitle, milestone?.title)
 
         if (form.notificationOn && form.notifEntries.length > 0) {
           await scheduleStructuredNotifications(editId, data.title, form.notifEntries)
@@ -280,7 +312,7 @@ export default function TasksClient() {
         .insert({ milestone_id: milestoneId, order_index: tasks.length, ...fullPayload, frequency: freq })
         .select().single()
 
-      // 試行2: 新カラム未作成 → 新カラムなし + frequency
+      // 試行2: Premium カラム未作成 → Premium なし + frequency
       if (error && isPremiumColErr(error.message)) {
         ;({ data, error } = await supabase
           .from('tasks')
@@ -288,12 +320,20 @@ export default function TasksClient() {
           .select().single())
       }
 
-      // 試行3: frequency カラム未作成 → frequency なし
+      // 試行3: 通知カラム未作成 → 通知なし + frequency
+      if (error && isNotifColErr(error.message)) {
+        ;({ data, error } = await supabase
+          .from('tasks')
+          .insert({ milestone_id: milestoneId, order_index: tasks.length, ...corePayload, frequency: freq })
+          .select().single())
+      }
+
+      // 試行4: frequency カラム未作成 → frequency なし
       if (error && isFreqColErr(error.message)) {
         useFrequencyCol = false
         ;({ data, error } = await supabase
           .from('tasks')
-          .insert({ milestone_id: milestoneId, order_index: tasks.length, ...basePayload })
+          .insert({ milestone_id: milestoneId, order_index: tasks.length, ...corePayload })
           .select().single())
       }
 
@@ -307,7 +347,7 @@ export default function TasksClient() {
             : null,
         }
         setTasks(prev => [...prev, newTask])
-        syncWidgetTasks([...tasks.map(t => t.title), newTask.title])
+        syncWidgetTasks([...tasks.map(t => t.title), newTask.title], goalTitle, milestone?.title)
 
         if (form.notificationOn && form.notifEntries.length > 0) {
           await scheduleStructuredNotifications(data.id, data.title, form.notifEntries)
@@ -333,7 +373,7 @@ export default function TasksClient() {
     cancelTaskNotifications(id)
     const next = tasks.filter(t => t.id !== id)
     setTasks(next)
-    syncWidgetTasks(next.map(t => t.title))
+    syncWidgetTasks(next.map(t => t.title), goalTitle, milestone?.title)
     if (editId === id) cancelEdit()
   }
 

@@ -114,7 +114,7 @@ export default function HomeClient() {
   if (!goal) {
     return (
       <div className="page-enter min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6 text-center">
-        <img src="/logo.svg" alt="REVIVE" className="w-16 h-16 mb-5" />
+        <img src="/app-icon.png" alt="REVIVE" className="w-16 h-16 mb-5 rounded-2xl" />
         <h1 className="text-2xl font-bold text-gray-900 mb-2">REVIVE</h1>
         <p className="text-gray-500 text-sm mb-8" style={{ whiteSpace: 'pre-line' }}>{t('home.emptyDesc')}</p>
         <Link

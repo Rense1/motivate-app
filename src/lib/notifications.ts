@@ -1,7 +1,7 @@
 /**
  * REVIVE — ローカル通知サービス
  * @capacitor/local-notifications を使用
- * Web では UI のみ（スケジュールは無視）、Android では実際に発火
+ * Web では UI のみ（スケジュールは無視）、Android/iOS では実際に発火
  */
 
 import { Capacitor } from '@capacitor/core'
@@ -26,10 +26,28 @@ export async function requestNotificationPermission(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
+
+    // POST_NOTIFICATIONS 権限 (Android 13+)
     const { display } = await LocalNotifications.checkPermissions()
-    if (display === 'granted') return true
-    const { display: result } = await LocalNotifications.requestPermissions()
-    return result === 'granted'
+    if (display !== 'granted') {
+      const { display: result } = await LocalNotifications.requestPermissions()
+      if (result !== 'granted') return false
+    }
+
+    // SCHEDULE_EXACT_ALARM 権限 (Android 12+)
+    // これがないと指定時刻に通知が来ない（大幅に遅延または未着）
+    if (Capacitor.getPlatform() === 'android') {
+      try {
+        const exactSetting = await LocalNotifications.checkExactNotificationSetting()
+        if (exactSetting.exact_alarm !== 'granted') {
+          await LocalNotifications.changeExactNotificationSetting()
+        }
+      } catch {
+        // 古い Capacitor バージョンでは API が存在しない場合がある → 無視
+      }
+    }
+
+    return true
   } catch {
     return false
   }
@@ -55,47 +73,51 @@ export async function scheduleStructuredNotifications(
   if (!Capacitor.isNativePlatform()) return
   if (entries.length === 0) return
 
-  const granted = await requestNotificationPermission()
-  if (!granted) return
+  try {
+    const granted = await requestNotificationPermission()
+    if (!granted) return
 
-  const { LocalNotifications } = await import('@capacitor/local-notifications')
-  await cancelTaskNotifications(taskId)
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    await cancelTaskNotifications(taskId)
 
-  const notifications: Parameters<typeof LocalNotifications.schedule>[0]['notifications'] = []
+    const notifications: Parameters<typeof LocalNotifications.schedule>[0]['notifications'] = []
 
-  entries.forEach((entry, idx) => {
-    if (entry.type === 'weekly') {
-      const [hh, mm] = entry.time.split(':').map(Number)
-      // Capacitor weekday: 1=日, 2=月, ..., 7=土
-      const weekday = (entry.day + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7
-      notifications.push({
-        id: stableId(taskId, idx),
-        title: '✅ タスクリマインダー',
-        body: taskTitle,
-        schedule: {
-          on: { weekday, hour: hh, minute: mm },
-          repeats: true,
-        },
-        channelId: 'revive_tasks',
-      })
-    } else {
-      // once
-      const at = new Date(entry.datetime)
-      if (at > new Date()) {
+    entries.forEach((entry, idx) => {
+      if (entry.type === 'weekly') {
+        const [hh, mm] = entry.time.split(':').map(Number)
+        // Capacitor weekday: 1=日, 2=月, ..., 7=土
+        const weekday = (entry.day + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7
         notifications.push({
           id: stableId(taskId, idx),
-          title: '⏰ タスクリマインダー',
-          body: taskTitle,
-          schedule: { at },
+          title: '今日のタスクを完了して自分の理想に近づこう！',
+          body: `タスク：${taskTitle}`,
+          sound: 'default',
+          schedule: {
+            on: { weekday, hour: hh, minute: mm },
+            repeats: true,
+          },
           channelId: 'revive_tasks',
         })
+      } else {
+        // once
+        const at = new Date(entry.datetime)
+        if (at > new Date()) {
+          notifications.push({
+            id: stableId(taskId, idx),
+            title: '今日のタスクを完了して自分の理想に近づこう！',
+            body: `タスク：${taskTitle}`,
+            sound: 'default',
+            schedule: { at },
+            channelId: 'revive_tasks',
+          })
+        }
       }
-    }
-  })
+    })
 
-  if (notifications.length > 0) {
-    await LocalNotifications.schedule({ notifications })
-  }
+    if (notifications.length > 0) {
+      await LocalNotifications.schedule({ notifications })
+    }
+  } catch { /* ignore */ }
 }
 
 // ── 通知チャンネル作成（Android 8+） ──────────────────────────────────────

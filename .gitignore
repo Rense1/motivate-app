@@ -27,13 +27,31 @@ out/
 build/
 
 # ============================
-# Expo / React Native (if using EAS)
+# Capacitor / Android / iOS
+# ============================
+android/
+ios/
+*.apk
+*.aab
+*.keystore
+
+# Android Studio build outputs
+android/app/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+
+# iOS build outputs
+ios/build/
+ios/Pods/
+ios/*.xcworkspace
+ios/*.xcuserdatad
+
+# ============================
+# Expo (if ever used)
 # ============================
 .expo/
 .expo-shared/
-android/app/build/
-ios/build/
-ios/Pods/
 
 # ============================
 # Supabase auto-generated files
@@ -42,6 +60,10 @@ supabase/.branches/
 supabase/.temp/
 supabase/.config/
 supabase/functions/.netlify/
+
+# Ignore all schema fragments except the final schema.sql
+supabase_schema_*.sql
+!supabase/schema.sql
 
 # ============================
 # Environment variables

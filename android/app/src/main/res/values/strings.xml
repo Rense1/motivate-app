@@ -1,8 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">REVIVE</string>
-    <string name="title_activity_main">REVIVE</string>
-    <string name="package_name">com.revive.app</string>
-    <string name="custom_url_scheme">com.revive.app</string>
-    <string name="widget_description">今日のタスクをホーム画面に表示します</string>
-</resources>

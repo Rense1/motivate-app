@@ -28,7 +28,7 @@ function LanguageSelectScreen({ onSelect }: { onSelect: (l: Lang) => void }) {
         transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 20 }}
         className="flex flex-col items-center mb-12"
       >
-        <img src="/logo.svg" alt="REVIVE" className="w-24 h-24 mb-4" />
+        <img src="/app-icon.png" alt="REVIVE" className="w-24 h-24 mb-4 rounded-3xl" />
         <span className="text-white/80 text-xs font-black tracking-widest uppercase">REVIVE</span>
       </motion.div>
 

@@ -131,7 +131,7 @@ export default function SignupPage() {
 
         {/* ロゴ */}
         <div className="flex flex-col items-center mb-6">
-          <img src="/logo.svg" alt="REVIVE" className="w-20 h-20 mb-3" />
+          <img src="/app-icon.png" alt="REVIVE" className="w-20 h-20 mb-3 rounded-2xl" />
           <span className="text-xs font-black tracking-widest text-red-600 uppercase">REVIVE</span>
         </div>
 
