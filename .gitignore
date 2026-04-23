@@ -62,6 +62,12 @@ supabase/.config/
 supabase/functions/.netlify/
 
 # ============================
+# Supabase schema files
+# ============================
+supabase_schema_*.sql
+!supabase_schema.sql
+
+# ============================
 # Project assets not for GitHub
 # ============================
 assets/
